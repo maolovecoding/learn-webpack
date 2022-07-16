@@ -232,3 +232,29 @@ module.exports = (env) => {
   };
 };
 ```
+
+### postcss
+
+**css兼容性处理：**
+需要借助一个很重要的工具，postcss
+
+```shell
+pnpm install postcss  postcss-loader postcss-preset-env -D
+```
+
+**postcss.config.js**:
+
+```js
+const postcssPresetEnv = require("postcss-preset-env");
+module.exports = {
+  plugins: [
+    postcssPresetEnv({
+      // 支持最新的五个版本
+      browsers: "last 5 version",
+    }),
+  ],
+};
+```
+
+**这里就不得不再提及一下前面我们css-loader的一个选项：importLoaders**:
+在我们设置该选项的值为一个数字的时候，我们在css文件里面如果加载了其他css，比如`@import url`这种形式，那么如果这个数字为0，或者设置为false了。那么我们不会对导入的css应用css-loader前面的loader进行处理：比如 `postcss-loader`

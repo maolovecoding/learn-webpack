@@ -5,3 +5,12 @@ body {
   color: red;
   background-image: url(../assets/mao.jpg);
 }
+
+.bar{
+  width: 200px;
+  height: 200px;
+  background-color: beige;
+  color: skyblue;
+  cursor: pointer;
+  transform: translate(100px, 100px);
+}

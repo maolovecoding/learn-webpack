@@ -37,6 +37,10 @@ module.exports = (env) => {
                 importLoaders: true,
               },
             },
+            // postcss
+            {
+              loader: "postcss-loader",
+            },
           ],
         },
         {
@@ -100,7 +104,7 @@ module.exports = (env) => {
       open: true, // 打包完毕后自动打开浏览器
     },
     resolve: {
-      // 别名 访问项目内资源的别名 
+      // 别名 访问项目内资源的别名
       // 如果想访问 node_modules下面的文件 可以在加载资源路径的时候 采用 ~node module name 开头 后面跟具体资源 css-loader 的功能
       alias: {
         "@": path.resolve(__dirname, "src"),
