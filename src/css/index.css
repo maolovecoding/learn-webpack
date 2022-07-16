@@ -3,4 +3,5 @@ body {
   width: 600px;
   height: 1000px;
   color: red;
+  background-image: url(../assets/mao.jpg);
 }
