@@ -68,6 +68,47 @@ module.exports = (env) => {
             },
           },
         },
+        {
+          test: /\.jsx?$/,
+          use: {
+            loader: "babel-loader",
+            // 配置
+            options: {
+              // 配置预设
+              presets: ["@babel/preset-env", "@babel/preset-react"],
+              // 插件
+              plugins: [
+                [
+                  // 支持装饰器
+                  "@babel/plugin-proposal-decorators",
+                  // 插件的参数
+                  // legacy 表示使用旧的装饰器语法
+                  {
+                    legacy: true,
+                    // 可以采用 export @xxx class Bar{} 的形式导出
+                    // decoratorsBeforeExport: true,
+                  },
+                ],
+                [
+                  // 类属性
+                  "@babel/plugin-proposal-class-properties",
+                  // true 给类属性赋值 采用实例化的对象赋值 a.xx = 'x' 不采用Object.defineProperty
+                  { loose: true },
+                ],
+                [
+                  // 私有方法
+                  "@babel/plugin-proposal-private-methods",
+                  { loose: true },
+                ],
+                [
+                  // 私有属性
+                  "@babel/plugin-proposal-private-property-in-object",
+                  { loose: true },
+                ],
+              ],
+            },
+          },
+        },
       ],
     },
     // 插件

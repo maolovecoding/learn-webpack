@@ -258,3 +258,87 @@ module.exports = {
 
 **这里就不得不再提及一下前面我们css-loader的一个选项：importLoaders**:
 在我们设置该选项的值为一个数字的时候，我们在css文件里面如果加载了其他css，比如`@import url`这种形式，那么如果这个数字为0，或者设置为false了。那么我们不会对导入的css应用css-loader前面的loader进行处理：比如 `postcss-loader`
+
+### babel
+
+安装会用到的一些库：
+
+```shell
+pnpm install babel-loader @babel/core @babel/preset-env @babel/preset-react -D
+pnpm install @babel/plugin-proposal-decorators @babel/plugin-proposal-class-properties @babel/plugin-proposal-private-property-in-object @babel/plugin-proposal-private-methods -D
+```
+
+**babel-loader 的配置：**
+
+```js
+{
+  test: /\.jsx?$/,
+  use: {
+    loader: "babel-loader",
+    // 配置
+    options: {
+      // 配置预设
+      presets: ["@babel/preset-env", "@babel/preset-react"],
+      // 插件
+      plugins: [
+        [
+          // 支持装饰器
+          "@babel/plugin-proposal-decorators",
+          // 插件的参数
+          // legacy 表示使用旧的装饰器语法
+          { legacy: true },
+        ],
+        [
+          // 类属性
+          "@babel/plugin-proposal-class-properties",
+          { loose: true },
+        ],
+        [
+          // 私有方法
+          "@babel/plugin-proposal-private-methods",
+          { loose: true },
+        ],
+        [
+          // 私有属性
+          "@babel/plugin-proposal-private-property-in-object",
+          { loose: true },
+        ],
+      ],
+    },
+  },
+},
+```
+
+**babel 是一个语法转换的引擎**，具体的转换规则是由插件决定的。每个插件可以转换一个语法。
+但是插件一个个的配置比较麻烦，所以我们出现了预设：也就是多个插件的集合。
+
+#### 装饰器
+
+支持装饰器语法：**jsconfig.json**
+
+```json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+**什么是装饰器：**
+
+```js
+function readonly(target, key, decorator) {
+  // 属性不可重写
+  decorator.writable = false;
+}
+
+class Number {
+  @readonly
+  PI = 3.14;
+}
+
+const n = new Number();
+console.log(n.PI);
+n.PI = 22; // 属性不可重写了
+console.log(n.PI);
+```
