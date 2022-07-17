@@ -363,3 +363,44 @@ pnpm install -D eslint eslint-loader babel-eslint
   // },
 },
 ```
+
+### 服务器代理
+
+如果你有单独的后端开发服务器API，并且希望在同域名下发送API请求，那么代理某些URL会很有用。
+
+代理只有在开发模式才有效：
+
+```js
+// 开发服务器
+devServer: {
+  // 额外的 静态资源目录
+  static: path.resolve(__dirname, "public"),
+  port: 8080, // 端口号
+  open: true, // 打包完毕后自动打开浏览器
+  proxy: {
+    // 配置代理
+    // "/api": "http://localhost:7777",
+    "/api": {
+      target: "http://localhost:7777",
+      // 路径重写
+      pathRewrite: {
+        "^/api": "",
+      },
+    },
+  },
+},
+```
+
+```js
+// webpack-dev-serve 内部就是一个express服务器 这里可以模拟后端
+onBeforeSetupMiddleware(devServer) {
+  devServer.app.get("/users", (req, res) => {
+    res.json({
+      success: true,
+      data: {
+        name: "zs",
+      },
+    });
+  });
+},
+```

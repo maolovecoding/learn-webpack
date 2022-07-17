@@ -155,6 +155,28 @@ module.exports = (env) => {
       static: path.resolve(__dirname, "public"),
       port: 8080, // 端口号
       open: true, // 打包完毕后自动打开浏览器
+      // proxy: {
+      //   // 配置代理
+      //   // "/api": "http://localhost:7777",
+      //   "/api": {
+      //     target: "http://localhost:7777",
+      //     // 路径重写
+      //     pathRewrite: {
+      //       "^/api": "",
+      //     },
+      //   },
+      // },
+      // webpack-dev-serve 内部就是一个express服务器 这里可以模拟后端
+      onBeforeSetupMiddleware(devServer) {
+        devServer.app.get("/users", (req, res) => {
+          res.json({
+            success: true,
+            data: {
+              name: "zs",
+            },
+          });
+        });
+      },
     },
     resolve: {
       // 别名 访问项目内资源的别名
