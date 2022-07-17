@@ -109,6 +109,18 @@ module.exports = (env) => {
             },
           },
         },
+        // 配置 eslint
+        // {
+        //   test: /\.jsx?$/,
+        //    use: {
+        //   loader: "eslint-loader",
+        //   options: {
+        //     enforce: "pre",
+        //     options: { fix: true },
+        //     exclude: /node_modules/,
+        //   },
+        //    },
+        // },
       ],
     },
     // 插件
