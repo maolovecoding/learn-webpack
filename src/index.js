@@ -1,11 +1,5 @@
-// const title = require("./title");
-// console.log(title);
-
-// const nameDefault = require("./name");
-// console.log(nameDefault);
-
-// import nameDefault, { name, obj } from "./name";
-// console.log(nameDefault, name, obj);
-
-import common, { name, age, friends } from "./common";
-console.log(common, name, age, friends);
+// 模块懒加载
+// 使用魔法注释 打包后模块文件名
+import(/* webpackChunkName: "lazy" */ "./lazy1").then((module) => {
+  console.log(module);
+});
