@@ -404,3 +404,283 @@ onBeforeSetupMiddleware(devServer) {
   });
 },
 ```
+
+### webpack 打包分析
+
+#### commonjs
+
+写一个很简单的代码：
+**title.js**
+
+```js
+module.exports = "title";
+```
+
+**index.js**:
+
+```js
+const title = require("./title");
+console.log(title);
+```
+
+**打包后的代码：去除注释后**：
+
+```js
+(() => {
+  var __webpack_modules__ = {
+    "./src/title.js": (module) => {
+      module.exports = "title";
+    },
+  };
+  var __webpack_module_cache__ = {};
+  function __webpack_require__(moduleId) {
+    var cachedModule = __webpack_module_cache__[moduleId];
+    if (cachedModule !== undefined) {
+      return cachedModule.exports;
+    }
+    var module = (__webpack_module_cache__[moduleId] = {
+      exports: {},
+    });
+    __webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+    return module.exports;
+  }
+  var __webpack_exports__ = {};
+  (() => {
+    const title = __webpack_require__("./src/title.js");
+    console.log(title);
+  })();
+})();
+```
+
+**整理，分析**：
+
+```js
+(() => {
+  var modules = {
+    // 模块名 路径 模块内容就是一个函数
+    "./src/title.js": (module) => {
+      module.exports = "title";
+    },
+  };
+  // 模块缓存
+  var cache = {};
+  function require(moduleId) {
+    // 加载模块前先查找缓存
+    var cachedModule = cache[moduleId];
+    if (cachedModule !== undefined) {
+      // 有缓存直接返回
+      return cachedModule.exports;
+    }
+    // 没有缓存 创建缓存对象 然后查找模块并执行
+    var module = (cache[moduleId] = {
+      exports: {},
+    });
+    modules[moduleId](module, module.exports, require);
+    return module.exports;
+  }
+  var exports = {};
+  (() => {
+    // 导入模块其实就是去我们的modules对象中找路径对应的函数并执行，拿到执行完的module.exports的结果
+    const title = require("./src/title.js");
+    console.log(title);
+  })();
+})();
+```
+
+#### ES Module to commonjs
+
+导出的是ES Module规范，导入是commonjs规范：
+**name.js**:
+
+```js
+export const name = "zs";
+export const obj = {
+  name,
+  age: 22,
+};
+export default "name";
+```
+
+**index.js**:
+
+```js
+const nameDefault = require("./name");
+console.log(nameDefault);
+```
+
+**打包产物分析：**有点妙了
+
+```js
+(() => {
+  var modules = {
+    "./src/name.js": (module, exports, require) => {
+      "use strict";
+      require.r(exports);
+      // 将导出的属性通过函数返回值的形式拿到 意味着每次取值都是动态的获取 可以获取到最新值 妙了！
+      require.d(exports, {
+        default: () => _DEFAULT_EXPORT__,
+        name: () => name,
+        obj: () => obj,
+      });
+      const name = "zs";
+      const obj = {
+        name,
+        age: 22,
+      };
+      // 定义默认导出
+      const _DEFAULT_EXPORT__ = "name";
+    },
+  };
+  var cache = {};
+  function require(moduleId) {
+    var cachedModule = cache[moduleId];
+    if (cachedModule !== undefined) {
+      return cachedModule.exports;
+    }
+    var module = (cache[moduleId] = {
+      exports: {},
+    });
+    modules[moduleId](module, module.exports, require);
+    return module.exports;
+  }
+  (() => {
+    require.d = (exports, definition) => {
+      for (var key in definition) {
+        // 需要导出的属性 不能是已经在exports上定义过的属性
+        if (require.o(definition, key) && !require.o(exports, key)) {
+          Object.defineProperty(exports, key, {
+            // 可枚举 可以获取值 但是不允许在导入后更改
+            enumerable: true,
+            get: definition[key],
+          });
+        }
+      }
+    };
+  })();
+  (() => {
+    // 判断属性是否是对象自身的属性
+    require.o = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop);
+  })();
+  (() => {
+    require.r = (exports) => {
+      // 定义es module 标识
+      // exports[Symbol.toStringTag] = "Module"
+      // exports["__esModule"] = true
+      if (typeof Symbol !== "undefined" && Symbol.toStringTag) {
+        Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+      }
+      Object.defineProperty(exports, "__esModule", { value: true });
+    };
+  })();
+  var exports = {};
+  (() => {
+    // commonjs 加载 es module的导出
+    const nameDefault = require("./src/name.js");
+    console.log(nameDefault);
+  })();
+})();
+```
+
+#### esModule to esModule
+
+基本上没什么特殊的。取默认值的时候就是通过`["default"]`取值而已。
+
+#### commonjs to esModule
+
+**commonjs导出，es module导入**：
+**common.js**:
+
+```js
+module.exports = {
+  name: "zs",
+  age: 22,
+  friends: ["ls", "zl"],
+};
+```
+
+**index.js**:
+
+```js
+import common, { name, age, friends } from "./common";
+console.log(common, name, age, friends);
+```
+
+**打包产物分析：**
+
+```js
+(() => {
+  var modules = {
+    "./src/common.js": (module) => {
+      module.exports = {
+        name: "zs",
+        age: 22,
+        friends: ["ls", "zl"],
+      };
+    },
+  };
+  var cache = {};
+  function require(moduleId) {
+    var cachedModule = cache[moduleId];
+    if (cachedModule !== undefined) {
+      return cachedModule.exports;
+    }
+    var module = (cache[moduleId] = {
+      exports: {},
+    });
+    modules[moduleId](module, module.exports, require);
+    return module.exports;
+  }
+  (() => {
+    // 取模块的默认导出内容 如果是es模块 就直接取default然后做成getter 如果是commonjs形式 也做成getter的形式 返回模块本身
+    require.n = (module) => {
+      var getter =
+        // es的默认导出已经是getter了
+        module && module.__esModule ? () => module["default"] : () => module;
+      // getter的a属性就是getter函数的返回值？？？
+      // 也就是说：我们不执行getter 直接通过 getter.a 也能拿到结果
+      // 为什么是 a ？ emmm 好像无所谓吧
+      require.d(getter, { a: getter });
+      return getter;
+    };
+  })();
+  (() => {
+    require.d = (exports, definition) => {
+      for (var key in definition) {
+        if (require.o(definition, key) && !require.o(exports, key)) {
+          Object.defineProperty(exports, key, {
+            enumerable: true,
+            get: definition[key],
+          });
+        }
+      }
+    };
+  })();
+  (() => {
+    require.o = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop);
+  })();
+  (() => {
+    require.r = (exports) => {
+      if (typeof Symbol !== "undefined" && Symbol.toStringTag) {
+        Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+      }
+      Object.defineProperty(exports, "__esModule", { value: true });
+    };
+  })();
+  var exports = {};
+  (() => {
+    "use strict";
+    // 只要打包前的模块是一个 es module 就会调用 r方法进行处理 这里index就是es
+    require.r(exports);
+    var _common_0__ = require("./src/common.js");
+    var _common_0___default = /*#__PURE__*/ require.n(_common_0__);
+    console.log(
+      _common_0___default(),
+      // 通过 a 属性就可以拿到default返回值
+      _common_0___default.a,
+      _common_0__.name,
+      _common_0__.age,
+      _common_0__.friends
+    );
+  })();
+})();
+```

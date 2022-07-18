@@ -2,21 +2,16 @@ const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 // 拷贝静态资源到打包目录
 const CopyWebpackPlugin = require("copy-webpack-plugin");
-const { DefinePlugin } = require("webpack");
+const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 module.exports = (env) => {
-  console.log(env);
-  console.log(process.env.NODE_ENV);
   return {
     mode: env.development ? "development" : "production",
-    // 单个入口
+    devtool: false,
     entry: "./src/index.js",
-    // 输出
     output: {
       path: path.resolve(__dirname, "dist"),
       filename: "bundle.js",
-      publicPath: "", // 默认是 "" 指定打包后的文件插入html文件时的访问路径前缀
     },
-    // 对模块的处理
     module: {
       rules: [],
     },
@@ -26,9 +21,8 @@ module.exports = (env) => {
       new HtmlWebpackPlugin({
         template: path.resolve(__dirname, "public/index.ejs"),
       }),
-      // 注入环境变量
-      new DefinePlugin({
-        // "process.env.NODE_ENV": JSON.stringify("development"),
+      new CleanWebpackPlugin({
+        cleanOnceBeforeBuildPatterns: ["**/*"],
       }),
       new CopyWebpackPlugin({
         patterns: [
