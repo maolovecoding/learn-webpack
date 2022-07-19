@@ -1226,3 +1226,153 @@ const target = core.transform(sourceCode, {
 });
 console.log(target.code);
 ```
+
+### webpack 的babel插件
+
+#### 按需加载插件
+
+```shell
+pnpm install babel-plugin-import -D
+```
+
+这里我们引入了lodash，并打印两个方法，也就是只使用了其中的两个方法，我们可以看见打包后的体积：大概474kb。这是一个很恐怖的大小。
+明明没使用那么多方法，但是都给我们打包在一起了。
+
+**webpack使用babel的按需加载插件：**
+
+```js
+module: {
+  rules: [
+    {
+      test: /\.js$/,
+      use: [
+        {
+          loader: "babel-loader",
+          options: {
+            // 按需加载插件 且指定按需加载的模块
+            plugins: [
+              [
+                "babel-plugin-import",
+                {
+                  // 按需加载的模块
+                  libraryName: "lodash",
+                  // 没有lib目录 从根目录下查找即可
+                  libraryDirectory: "",
+                },
+              ],
+            ],
+          },
+        },
+      ],
+    },
+  ],
+},
+```
+
+此时打包后的大小也就是在20kb左右了。
+
+#### 按需加载插件的原理
+
+**其实就算没有按需加载插件，只要我们在导入方法的时候，是手动一个个引入的，也会呈现按需导入的效果：**
+
+```js
+import flatten from "lodash/flatten";
+import concat from "lodash/concat";
+console.log(flatten, concat);
+```
+
+也就是说，按需加载的插件最后就是会转成这种形式
+
+#### 实现按需导入的插件
+
+这种按需加载的库，都是内部是由一个个小的文件组成的才能实现按需加载。
+
+```js
+// 用来生成某些AST节点或者判断某个节点是不是需要某个类型的
+const types = require("@babel/types");
+
+module.exports = function () {
+  return {
+    visitor,
+  };
+};
+const visitor = {
+  /**
+   * 当babel遍历语法树的时候，当遍历到 ImportDeclaration 导入声明节点时候会执行此函数
+   * @param {*} nodePath
+   * @param {*} state
+   */
+  ImportDeclaration(nodePath, state) {
+    // 拿到node
+    const { node } = nodePath;
+    // 获取导入标识符
+    const { specifiers } = node;
+    // 获取webpack配置文件中配置的参数
+    const { libraryName, libraryDirectory = "lib" } = state.opts;
+    // 按需加载的 且当前导入不是默认导入
+    if (
+      node.source.value === libraryName &&
+      !types.isImportDefaultSpecifier(specifiers[0])
+    ) {
+      const declarations = specifiers.map((specifier) => {
+        return types.importDeclaration(
+          [types.importDefaultSpecifier(specifier.local)],
+          types.stringLiteral(
+            // `${libraryName}/${libraryDirectory}/${specifier.imported.name}`
+            [libraryName, libraryDirectory, specifier.imported.name]
+              .filter(Boolean)
+              .join("/")
+          )
+        );
+      });
+      nodePath.replaceWithMultiple(declarations);
+    }
+  },
+};
+```
+
+#### 实现console打印时自动加上行列信息的插件
+
+```js
+// 用来生成某些AST节点或者判断某个节点是不是需要某个类型的
+const types = require("@babel/types");
+const path = require("path");
+module.exports = function () {
+  return {
+    visitor,
+  };
+};
+const visitor = {
+  /**
+   * 捕获console.log
+   * @param {*} nodePath
+   * @param {*} state
+   */
+  CallExpression(nodePath, state) {
+    const { node } = nodePath;
+    // 成员表达式
+    if (types.isMemberExpression(node.callee)) {
+      // 是console
+      if ((name = node.callee.object.name === "console")) {
+        // 方法是 log 等
+        if (
+          ["log", "debug", "info", "warn", "error"].includes(
+            node.callee.property.name
+          )
+        ) {
+          const { line, column } = node.loc.start; // 起始位置信息
+          // 获取文件名
+          const filename = path
+            .relative(path.resolve("."), state.file.opts.filename)
+            .replace(/\\/g, "/")
+            .replace(/\.\./, "");
+          // 在前面添加参数
+          node.arguments.unshift(
+            types.stringLiteral(`${filename}: ${line}: ${column}`)
+          );
+        }
+      }
+    }
+  },
+};
+```

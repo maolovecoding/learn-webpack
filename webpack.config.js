@@ -13,7 +13,31 @@ module.exports = (env) => {
       filename: "bundle.js",
     },
     module: {
-      rules: [],
+      rules: [
+        {
+          test: /\.js$/,
+          use: [
+            {
+              loader: "babel-loader",
+              options: {
+                // 按需加载插件 且指定按需加载的模块
+                plugins: [
+                  path.resolve(__dirname, "./plugins/babel-logger.js"),
+                  [
+                    path.resolve(__dirname, "./plugins/babel-plugin-import.js"),
+                    {
+                      // 按需加载的模块
+                      libraryName: "lodash",
+                      // 没有lib目录 从根目录下查找即可
+                      libraryDirectory: "",
+                    },
+                  ],
+                ],
+              },
+            },
+          ],
+        },
+      ],
     },
     // 插件
     plugins: [
