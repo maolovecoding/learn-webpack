@@ -2,6 +2,7 @@
   "cSpell.words": [
     "escodegen",
     "estraverse",
-    "pnpm"
+    "pnpm",
+    "tapable"
   ]
 }
