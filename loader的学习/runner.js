@@ -41,12 +41,16 @@ for (let i = 0; i < rules.length; i++) {
   }
 }
 // loaders 合并所有loader 按照顺序
-let loaders = [
-  ...postLoaders,
-  ...inlineLoaders,
-  ...normalLoaders,
-  ...preLoaders,
-];
+let loaders;
+if (request.startsWith("-!")) {
+  loaders = [...postLoaders, ...inlineLoaders];
+} else if (request.startsWith("!!")) {
+  loaders = inlineLoaders;
+} else if (request.startsWith("!")) {
+  loaders = [...postLoaders, ...inlineLoaders, ...preLoaders];
+} else {
+  loaders = [...postLoaders, ...inlineLoaders, ...normalLoaders, ...preLoaders];
+}
 // 解析loader的绝对路径
 const resolveLoader = (loader) => path.resolve(__dirname, "../loaders", loader);
 loaders = loaders.map(resolveLoader);

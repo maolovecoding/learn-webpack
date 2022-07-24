@@ -1460,7 +1460,7 @@ enforce属性 是一个配置 用来决定loader的类型的 一般loader都是�
 叠加顺序是：post(后置) + inline(行内) + normal(正常) + pre(前置)
 
 ```js
-const parts = request.replace(/^-?!+/, "").split("!");
+const parts = request.split("!");
 // 最后一个元素是要加载的模块
 const resource = parts.pop();
 // 行内loader
@@ -1507,3 +1507,132 @@ runLoaders(
 ```
 
 可以看见，最后打印的输出结果中，是先打印pre-loader，然后是normal-loader,然后是inline-loader，。最后是post-loader。
+
+### loader特殊配置
+
+webpack提供了几个特殊配置：
+如果我们只想要pre-loader，或者只想要post-loader等，都是可以的。
+就是通过特殊符号，`-! ,! ,!!`来实现的
+
+- -!: noPreAutoLoaders。不要pre和normal-loader
+- !: noAutoLoaders：不要normal-loader
+- !!: noPrePostLoaders：不要pre，post，normal-loader。只要inline-loader
+
+```js
+const parts = request.replace(/^-?!+/, "").split("!");
+// ......
+// loaders 合并所有loader 按照顺序
+let loaders;
+if (request.startsWith("-!")) {
+  loaders = [...postLoaders, ...inlineLoaders];
+} else if (request.startsWith("!!")) {
+  loaders = inlineLoaders;
+} else if (request.startsWith("!")) {
+  loaders = [...postLoaders, ...inlineLoaders, ...preLoaders];
+} else {
+  loaders = [...postLoaders, ...inlineLoaders, ...normalLoaders, ...preLoaders];
+}
+```
+
+### pitch
+
+前面我们说loader的执行是从右向左的。但是实际上在执行过程中，也会从左到右执行一遍，然后才从右到左。
+从左到右先执行的，就是loader的pitch。
+**什么是pitch：？**
+比如：行内级的loader：`a!b!c!xxx.js`,执行顺序肯定是c，b，a。但是真正的执行顺序其实是 a (pitch),b(pitch),c(pitch)。abc 中任何一个pitching loader返回了值，就相当于在它以及它右边的loader已经执行完毕
+
+- 如果b pitch 返回了字符串 "hello",接下来只有a loader会被执行，且a的参数是b pitch的返回值。
+- loader的根据返回值分为两种，一种是直接返回js字符串代码（一个含有module发代码，有类似module.exports语句）的loader，还有不能作为最左边loader的其他loader
+- 有时候我们想把两个第一种loader chain起来，比如style-loader，css-loader、问题是css-loader的返回值是一串js代码，如果按正常方式写style-loader的参数就是一串代码字符串
+- 为了解决这种问题，我们需要在style-loader里执行`require("css-loader!resource")`
+
+正如上面的我们的8个loader，如果都有pitch方法：
+
+```js
+function loader(source) {
+  console.log("inline1  ......");
+  return source + "//inline1 loader";
+}
+// 配置pitch
+loader.pitch = function () {
+  console.log("inline 1 pitch !!!");
+};
+module.exports = loader;
+```
+
+可以看见打印效果：
+
+```txt
+post1 pitch !!!
+post2 pitch !!!
+inline 1 pitch !!!
+inline 2 pitch !!!
+normal1 pitch !!!
+normal2 pitch !!!
+pre1 pitch !!!
+pre2 pitch !!!
+pre2  ......
+pre1  ......
+normal2  ......
+normal1  ......
+inline2  ......
+inline1  ......
+post2  ......
+post1  ......
+null
+------------------------------------------
+console.log("hello index");
+//pre2 loader//pre1 loader//normal2 loader//normal1 loader//inline2 loader//inline1 loader//post2 loader//post1 loader
+------------------------------------------
+console.log("hello index");
+```
+
+很明显是先都执行了一遍从左到右的loader.pitch方法。
+如果pitch方法没有返回值，那就继续执行下一个loader，如果pitch方法有返回值，就直接结束。执行loader的时候，也只会从当前结束这个loader.pitch开始的上一个loader开始执行。且将当前pitch的返回值作为上一个loader的参数。(注意，当前pitch有返回值的loader也不会执行了)
+比如：我们在inline2-loader的pitch方法进行返回：
+
+```js
+function loader(source) {
+  console.log("inline2  ......");
+  return source + "//inline2 loader";
+}
+// 配置pitch
+loader.pitch = function () {
+  console.log("inline 2 pitch !!!");
+  return "inline 2 return !!!"
+};
+module.exports = loader;
+```
+
+结果：
+
+```txt
+post1 pitch !!!
+post2 pitch !!!
+inline 1 pitch !!!
+inline 2 pitch !!!
+inline1  ......
+post2  ......
+post1  ......
+```
+
+#### 异步loader
+
+当然，只要你想，loader也可以是异步的：比如
+
+```js
+function loader(source) {
+  console.log("post2  ......");
+  // 让loader的执行变成异步
+  // 调用this.async() 可以吧loader的执行由同步变成异步了
+  // return source + "//post2 loader";
+  const callback = this.async();
+  setTimeout(() => {
+    callback(null, source + "//post2 loader");
+  }, 3000);
+}
+loader.pitch = function () {
+  console.log("post2 pitch !!!");
+};
+module.exports = loader;
+```
