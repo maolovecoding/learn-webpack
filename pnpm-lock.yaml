@@ -2,6 +2,8 @@ lockfileVersion: 5.4
 
 specifiers:
   '@babel/core': ^7.18.6
+  '@babel/generator': ^7.18.9
+  '@babel/parser': ^7.18.9
   '@babel/plugin-proposal-class-properties': ^7.18.6
   '@babel/plugin-proposal-decorators': ^7.18.6
   '@babel/plugin-proposal-private-methods': ^7.18.6
@@ -9,6 +11,7 @@ specifiers:
   '@babel/plugin-transform-classes': ^7.18.9
   '@babel/preset-env': ^7.18.6
   '@babel/preset-react': ^7.18.6
+  '@babel/traverse': ^7.18.9
   '@babel/types': ^7.18.9
   babel-eslint: ^10.1.0
   babel-loader: ^8.2.5
@@ -39,6 +42,8 @@ dependencies:
 
 devDependencies:
   '@babel/core': registry.npmmirror.com/@babel/core/7.18.6
+  '@babel/generator': registry.npmmirror.com/@babel/generator/7.18.9
+  '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.9
   '@babel/plugin-proposal-class-properties': registry.npmmirror.com/@babel/plugin-proposal-class-properties/7.18.6_@babel+core@7.18.6
   '@babel/plugin-proposal-decorators': registry.npmmirror.com/@babel/plugin-proposal-decorators/7.18.6_@babel+core@7.18.6
   '@babel/plugin-proposal-private-methods': registry.npmmirror.com/@babel/plugin-proposal-private-methods/7.18.6_@babel+core@7.18.6
@@ -46,6 +51,7 @@ devDependencies:
   '@babel/plugin-transform-classes': registry.npmmirror.com/@babel/plugin-transform-classes/7.18.9_@babel+core@7.18.6
   '@babel/preset-env': registry.npmmirror.com/@babel/preset-env/7.18.6_@babel+core@7.18.6
   '@babel/preset-react': registry.npmmirror.com/@babel/preset-react/7.18.6_@babel+core@7.18.6
+  '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.9
   '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
   babel-eslint: registry.npmmirror.com/babel-eslint/10.1.0_eslint@8.19.0
   babel-loader: registry.npmmirror.com/babel-loader/8.2.5_fswvdo7jykdwhfxrdcvghfn6pa
@@ -106,13 +112,13 @@ packages:
     dependencies:
       '@ampproject/remapping': registry.npmmirror.com/@ampproject/remapping/2.2.0
       '@babel/code-frame': registry.npmmirror.com/@babel/code-frame/7.18.6
-      '@babel/generator': registry.npmmirror.com/@babel/generator/7.18.7
+      '@babel/generator': registry.npmmirror.com/@babel/generator/7.18.9
       '@babel/helper-compilation-targets': registry.npmmirror.com/@babel/helper-compilation-targets/7.18.6_@babel+core@7.18.6
       '@babel/helper-module-transforms': registry.npmmirror.com/@babel/helper-module-transforms/7.18.8
       '@babel/helpers': registry.npmmirror.com/@babel/helpers/7.18.6
-      '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.8
+      '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.9
       '@babel/template': registry.npmmirror.com/@babel/template/7.18.6
-      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.8
+      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.9
       '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
       convert-source-map: registry.npmmirror.com/convert-source-map/1.8.0
       debug: registry.npmmirror.com/debug/4.3.4
@@ -121,17 +127,6 @@ packages:
       semver: registry.npmmirror.com/semver/6.3.0
     transitivePeerDependencies:
       - supports-color
-    dev: true
-
-  registry.npmmirror.com/@babel/generator/7.18.7:
-    resolution: {integrity: sha512-shck+7VLlY72a2w9c3zYWuE1pwOKEiQHV7GTUbSnhyl5eu3i04t30tBY82ZRWrDfo3gkakCFtevExnxbkf2a3A==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/@babel/generator/-/generator-7.18.7.tgz}
-    name: '@babel/generator'
-    version: 7.18.7
-    engines: {node: '>=6.9.0'}
-    dependencies:
-      '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
-      '@jridgewell/gen-mapping': registry.npmmirror.com/@jridgewell/gen-mapping/0.3.2
-      jsesc: registry.npmmirror.com/jsesc/2.5.2
     dev: true
 
   registry.npmmirror.com/@babel/generator/7.18.9:
@@ -327,7 +322,7 @@ packages:
       '@babel/helper-split-export-declaration': registry.npmmirror.com/@babel/helper-split-export-declaration/7.18.6
       '@babel/helper-validator-identifier': registry.npmmirror.com/@babel/helper-validator-identifier/7.18.6
       '@babel/template': registry.npmmirror.com/@babel/template/7.18.6
-      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.8
+      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.9
       '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
     transitivePeerDependencies:
       - supports-color
@@ -380,10 +375,10 @@ packages:
     version: 7.18.6
     engines: {node: '>=6.9.0'}
     dependencies:
-      '@babel/helper-environment-visitor': registry.npmmirror.com/@babel/helper-environment-visitor/7.18.6
+      '@babel/helper-environment-visitor': registry.npmmirror.com/@babel/helper-environment-visitor/7.18.9
       '@babel/helper-member-expression-to-functions': registry.npmmirror.com/@babel/helper-member-expression-to-functions/7.18.6
       '@babel/helper-optimise-call-expression': registry.npmmirror.com/@babel/helper-optimise-call-expression/7.18.6
-      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.8
+      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.9
       '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
     transitivePeerDependencies:
       - supports-color
@@ -466,7 +461,7 @@ packages:
     engines: {node: '>=6.9.0'}
     dependencies:
       '@babel/template': registry.npmmirror.com/@babel/template/7.18.6
-      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.8
+      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.9
       '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
     transitivePeerDependencies:
       - supports-color
@@ -481,16 +476,6 @@ packages:
       '@babel/helper-validator-identifier': registry.npmmirror.com/@babel/helper-validator-identifier/7.18.6
       chalk: registry.npmmirror.com/chalk/2.4.2
       js-tokens: registry.npmmirror.com/js-tokens/4.0.0
-    dev: true
-
-  registry.npmmirror.com/@babel/parser/7.18.8:
-    resolution: {integrity: sha512-RSKRfYX20dyH+elbJK2uqAkVyucL+xXzhqlMD5/ZXx+dAAwpyB7HsvnHe/ZUGOF+xLr5Wx9/JoXVTj6BQE2/oA==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/@babel/parser/-/parser-7.18.8.tgz}
-    name: '@babel/parser'
-    version: 7.18.8
-    engines: {node: '>=6.0.0'}
-    hasBin: true
-    dependencies:
-      '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
     dev: true
 
   registry.npmmirror.com/@babel/parser/7.18.9:
@@ -1643,28 +1628,8 @@ packages:
     engines: {node: '>=6.9.0'}
     dependencies:
       '@babel/code-frame': registry.npmmirror.com/@babel/code-frame/7.18.6
-      '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.8
+      '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.9
       '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
-    dev: true
-
-  registry.npmmirror.com/@babel/traverse/7.18.8:
-    resolution: {integrity: sha512-UNg/AcSySJYR/+mIcJQDCv00T+AqRO7j/ZEJLzpaYtgM48rMg5MnkJgyNqkzo88+p4tfRvZJCEiwwfG6h4jkRg==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/@babel/traverse/-/traverse-7.18.8.tgz}
-    name: '@babel/traverse'
-    version: 7.18.8
-    engines: {node: '>=6.9.0'}
-    dependencies:
-      '@babel/code-frame': registry.npmmirror.com/@babel/code-frame/7.18.6
-      '@babel/generator': registry.npmmirror.com/@babel/generator/7.18.7
-      '@babel/helper-environment-visitor': registry.npmmirror.com/@babel/helper-environment-visitor/7.18.9
-      '@babel/helper-function-name': registry.npmmirror.com/@babel/helper-function-name/7.18.9
-      '@babel/helper-hoist-variables': registry.npmmirror.com/@babel/helper-hoist-variables/7.18.6
-      '@babel/helper-split-export-declaration': registry.npmmirror.com/@babel/helper-split-export-declaration/7.18.6
-      '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.8
-      '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
-      debug: registry.npmmirror.com/debug/4.3.4
-      globals: registry.npmmirror.com/globals/11.12.0
-    transitivePeerDependencies:
-      - supports-color
     dev: true
 
   registry.npmmirror.com/@babel/traverse/7.18.9:
@@ -2583,8 +2548,8 @@ packages:
       eslint: '>= 4.12.1'
     dependencies:
       '@babel/code-frame': registry.npmmirror.com/@babel/code-frame/7.18.6
-      '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.8
-      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.8
+      '@babel/parser': registry.npmmirror.com/@babel/parser/7.18.9
+      '@babel/traverse': registry.npmmirror.com/@babel/traverse/7.18.9
       '@babel/types': registry.npmmirror.com/@babel/types/7.18.9
       eslint: registry.npmmirror.com/eslint/8.19.0
       eslint-visitor-keys: registry.npmmirror.com/eslint-visitor-keys/1.3.0

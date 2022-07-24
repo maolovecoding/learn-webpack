@@ -1391,3 +1391,9 @@ const visitor = {
 - 确定好输出内容之后，会根据配置的输出路径和文件名，把文件内容写入到文件系统里
 
 > 在此过程中，webpack会在合适的世界点广播特定的事件，你可以自己写插件监听感兴趣的事件，执行特定的逻辑
+
+编译模块用到的一些库：
+
+```shell
+pnpm i @babel/parser @babel/types @babel/traverse @babel/generator -D
+```
