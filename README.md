@@ -1397,3 +1397,24 @@ const visitor = {
 ```shell
 pnpm i @babel/parser @babel/types @babel/traverse @babel/generator -D
 ```
+
+## 实现 简易的webpack 学习工作流
+
+## loader的学习
+
+- loader 只是一个导出为函数的 JavaScript模块。它接收上一个loader产生的结果或者资源文件（resource file） 作为参数。也可以用多个loader函数组成 loader chain
+- compiler需要得到最后一个loader产生的处理结果。这个处理结果应该是string或者buffer（可以转为string）
+
+### 流程
+
+1. 初始化参数，从配置文件和shell中读取合并参数，得出最终参数
+2. 开始编译，用上一步得到的参数初始化Compiler对象，加载所有插件，执行该对象的run方法开始编译。确定入口：根据entry找到所有入口文件
+3. 编译模块：从入口文件触发，调用所有配置的loader对模块进行编译，再找出该模块的依赖，递归此步骤知道所有的入口依赖文件都经过了本步骤的处理
+4. 完成编译：在经过上面步骤使用Loader转译完所有模块后，得到了每个模块被翻译后的最终内容以及它们之间的依赖关系
+5. 输出资源：根据入口和模块之间的依赖关系，组成一个个包含多个模块的chunk，再把每个chunk转换成一个个单独的文件加入到输出列表
+
+### loader-runner
+
+是一个指向loader链条的模块。可以单独执行一遍loader。
+多个loader的执行是从右向左，从下到上的。也就是先执行后面的loader。
+但是实际上是执行了两遍loader，开始先从左往右执行，然后再从有右往左执行一遍。
