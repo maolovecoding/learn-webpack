@@ -1,1 +1,4 @@
-console.log("hello index");
+import { name } from "./title";
+const sum = (a, b) => a + b;
+debugger;
+console.log(sum(1, 2), name);

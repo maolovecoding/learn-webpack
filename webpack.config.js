@@ -1,3 +1,4 @@
+const HtmlWebpackPlugin = require("html-webpack-plugin");
 const path = require("path");
 module.exports = {
   entry: {
@@ -7,8 +8,28 @@ module.exports = {
     path: path.resolve(__dirname, "dist"),
     filename: "[name].js",
   },
-  module: {
-    rules: [],
+  devtool:"source-map",
+  resolveLoader: {
+    alias: {
+      "babel-loader": path.resolve(__dirname, "./loader/babel-loader.js"),
+    },
   },
-  plugins: [],
+  module: {
+    rules: [
+      {
+        test: /\.js/,
+        use: {
+          loader: "babel-loader",
+          options: {
+            presets: ["@babel/preset-env"],
+          },
+        },
+      },
+    ],
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: "./public/index.html",
+    }),
+  ],
 };

@@ -1636,3 +1636,93 @@ loader.pitch = function () {
 };
 module.exports = loader;
 ```
+
+### babel-loader的学习
+
+使用自定义loader的方式：
+
+1. 直接用loader的绝对路径
+2. 可以通过resolveLoader属性，配置在下面想使用的loader的别名，以及loader的绝对路径
+
+    ```js
+    module.exports = {
+      resolveLoader:{
+        alias: {
+          "test-loader": path.resolve(__dirname, "xxx")
+        },
+      },
+      module:{
+          rules: [
+            {
+              test:/\.js/,
+              use: {
+                loader: "test-loader"
+              }
+            }
+          ]
+        }
+    }
+    ```
+
+3. 可以通过`resolveLoader.modules`属性配置查找的模块所在的文件夹目录等
+
+    ```js
+    module.exports = {
+      resolveLoader:{
+        alias: {
+          "test-loader": path.resolve(__dirname, "xxx")
+        },
+        modules: [path.resolve("xxx module"), "node_modules"]
+      },
+      module:{
+          rules: [
+            {
+              test:/\.js/,
+              use: {
+                loader: "test-loader"
+              }
+            }
+          ]
+        }
+    }
+    ```
+
+#### babel-loader 的作用
+
+babel-loader 只是提供一个转换函数，但是它并不知道要干啥，要转啥。
+`@babel/core`核心包负责把源代码转成AST，然后遍历AST，然后重新生成新的代码！
+但是它并不知道如何转换语法树，比如它不认识箭头函数，不知道如何转为函数声明的形式，也就是说如何转换它并不知道，但是它会提供一些访问AST的接口，也就是访问器模式了。我们可以使用`@babel/transform-arrow-functions`插件，该插件就是访问器，它知道如何转换AST语法树。因为要转换的语法太多，导致插件也太多（单一职责），所以可以把一堆插件打包在一起，成为预设`preset-env`,就是插件的集合。
+
+**babel-loader**：
+
+```js
+const core = require("@babel/core");
+const { getOptions } = require("loader-utils");
+/**
+ * 
+ * @param {*} source 源代码
+ * @param {*} inputSourceMap 上一个loader的source-map文件
+ */
+function babelLoader(source, inputSourceMap) {
+  // this 就是loader函数的this指针，loaderContext对象
+  // const options = getOptions(this); // 老的获取options的方式
+  // 新的方式获取 当前loader的options
+  const options = this.getOptions();
+  const loaderOptions = {
+    ...options,
+    inputSourceMap, // 上一个loader的source-map 没有该选项 就是直接生成了
+    sourceMap: true, // 基于上一个source-map 生成自己的 source-map 多个source-map的生成必然消耗性能
+    filename: this.resourcePath, // 映射为的源文件名
+  };
+  // code 转义后的代码 map 源代码和转换后代码的映射文化  ast 抽象语法树
+  const { code, map, ast } = core.transform(source, loaderOptions);
+  console.log(map);
+  // 通过callback的形式 可以传递多个参数给下一个loader 也是同步的
+  this.callback(null, code, map, ast);
+  // return source;
+}
+
+module.exports = babelLoader;
+```
+
+当然，如果在webpack配置文件中，配置了`devtool: "source-map"`.生成的map文件是最全的。
