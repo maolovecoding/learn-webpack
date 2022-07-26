@@ -4,5 +4,7 @@ function loader(source) {
 }
 loader.pitch = function () {
   console.log("post1 pitch !!!");
+  const callback = this.async();
+  setTimeout(callback, 3000);
 };
 module.exports = loader;

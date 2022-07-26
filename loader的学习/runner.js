@@ -1,4 +1,4 @@
-const { runLoaders } = require("loader-runner");
+const { runLoaders } = require("../loader-runner");
 const path = require("path");
 const fs = require("fs");
 // enforce属性 是一个配置 用来决定loader的类型的 一般loader都是后面的先执行 这个属性是强制修改执行顺序的可以
