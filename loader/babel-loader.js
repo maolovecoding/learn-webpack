@@ -18,7 +18,7 @@ function babelLoader(source, inputSourceMap) {
   };
   // code 转义后的代码 map 源代码和转换后代码的映射文化  ast 抽象语法树
   const { code, map, ast } = core.transform(source, loaderOptions);
-  console.log(map);
+  // console.log(map);
   // 通过callback的形式 可以传递多个参数给下一个loader 也是同步的
   this.callback(null, code, map, ast);
   // return source;

@@ -1726,3 +1726,180 @@ module.exports = babelLoader;
 ```
 
 当然，如果在webpack配置文件中，配置了`devtool: "source-map"`.生成的map文件是最全的。
+
+### style-loader学习
+
+- css-loader的作用是处理css中的`@import`和`url`这样的外部资源
+- `style-loader`的作用是把样式插入到DOM中，方法是在`head`中插入一个`style`标签，并把样式写入到这个标签的`innerHTML`里面
+- less-loader 可以把less编译为css
+- pitching-loader
+- loader-utils（webpack5可以使用this.getOptions获取loader的选项）
+- !!
+
+#### style-loader和less-loader的基本原理
+
+webpack配置：
+
+```js
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+const path = require("path");
+module.exports = {
+  // ...
+  devtool: "source-map",
+  resolveLoader: {
+    alias: {
+      "babel-loader": path.resolve(__dirname, "./loader/babel-loader.js"),
+      "less-loader": path.resolve(__dirname, "./loader/less-loader.js"),
+      "style-loader": path.resolve(__dirname, "./loader/style-loader.js"),
+    },
+  },
+  module: {
+    rules: [
+      {
+        test: /\.less$/,
+        use: [
+          { loader: "style-loader" },
+          { loader: "less-loader" },
+        ],
+      },
+    ],
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: "./public/index.html",
+    }),
+  ],
+};
+```
+
+**less-loader**的原理：
+
+```js
+const less = require("less");
+function lessLoader(lessContent) {
+  // console.log(this.resource, this.resourcePath); // 一样的
+  // 1. 同步转为异步loader  2. 返回一个callback 调用callback向下一个loader传递参数
+  const callback = this.async();
+  less.render(lessContent, { filename: this.resource }, (err, output) => {
+    // less转为css交给下一个loader
+    callback(err, output.css);
+  });
+}
+module.exports = lessLoader;
+```
+
+**style-loader**的原理：
+
+```js
+function styleLoader(cssContent) {
+  const script = `
+    const style = document.createElement("style");
+    style.innerHTML = ${JSON.stringify(cssContent)};
+    document.head.append(style);
+  `;
+  return script;
+}
+
+module.exports = styleLoader;
+```
+
+#### loader返回脚本
+
+对于多个loader组成的loader chain，其执行的最左侧loader（最后执行的loader）必须返回一个脚本，因为webpack只认识脚本。
+但是对于前面的loader，其返回值可以是任意的，因为后面还有其他loader会对我们的产物进行处理，转为脚本或者对产物进一步处理。
+
+比如我们前面的`less-loader`我们就可以这样更改：返回值变成了一个模块导出内容的字符串脚本形式了。
+
+```js
+const less = require("less");
+function lessLoader(lessContent) {
+  // 1. 同步转为异步loader  2. 返回一个callback 调用callback向下一个loader传递参数
+  const callback = this.async();
+  // console.log(this.resource, this.resourcePath); // 一样的
+  // 看似异步  实际上 less.render的执行是同步的，包括回调也是同步执行
+  // 如果不想用异步loader 其实用一个变量在回调中接收返回值，在下面直接return 也是可以的
+  // let css;
+  less.render(lessContent, { filename: this.resource }, (err, output) => {
+    // less转为css交给下一个loader
+    // console.log(output);
+    // callback(err, output.css);
+    // css = `module.exports = ${JSON.stringify(output.css)}`
+    // 直接返回一个 脚本字符串 （可以认为是模块导出了）
+    callback(err, `module.exports = ${JSON.stringify(output.css)}`);
+  });
+  // return css;
+}
+
+module.exports = lessLoader;
+```
+
+**那么对于style-loader**，也需要再次修改：
+
+```js
+// const { stringifyRequest } = require("loader-utils");
+const path = require("path");
+function styleLoader(cssContent) {}
+/**
+ * @param {*} remainingRequest 剩下的 request 还没执行的loader
+ */
+styleLoader.pitch = function (remainingRequest) {
+  // F:\vscode\webFile\webpack\learn-webpack\loader\less-loader.js!F:\vscode\webFile\webpack\learn-webpack\src\index.less
+  console.log(remainingRequest);
+  // "!!../loader/less-loader.js!./index.less"
+  console.log(stringifyRequest(this, "!!" + remainingRequest));
+  // style-loader less-loader index.less
+  // 剩下没执行的 就是 less-loader!index.less
+  // webpack会再次解析这个模块index.less，而且因为 !! 只会走行内loader了
+  // 相当于走了两次loader的流程：第一次走到style.pitch这个环节就结束了，第二次只走less-loader了
+  const script = `
+    const style = document.createElement("style");
+    style.innerHTML = require(${stringifyRequest(
+      this,
+      "!!" + remainingRequest
+    )});
+    document.head.append(style);
+  `;
+  return script;
+};
+function stringifyRequest(loaderContext, request) {
+  const splitted = request.replace(/^-?!+/, "").split("!");
+  // 项目根路径
+  const { context } = loaderContext;
+  return JSON.stringify(
+    "!!" +
+      splitted
+        .map((part) => {
+          part = path.relative(context, part);
+          if (part[0] !== ".") part = "./" + part;
+          return part.replace(/\\/g, "/");
+        })
+        .join("!")
+  );
+}
+module.exports = styleLoader;
+```
+
+其实分析一下打包产物，也可以看出来，第一遍加载index.less的时候，并没有真正的数据，其内部还需要再次加载一次通过less-loader处理后的产物。
+
+```js
+var modules = {
+  "./src/title.js": (module, exports) => {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", {
+      value: true,
+    });
+    exports.name = void 0;
+    var name = "zs";
+    exports.name = name;
+  },
+  "./loader/less-loader.js!./src/index.less": (module) => {
+    module.exports =
+      "body {\n  background-color: #bfc;\n}\n.root {\n  background-color: aqua;\n  width: 200px;\n  height: 200px;\n  color: #bfc;\n}\n";
+  },
+  "./src/index.less": (module, __unused_webpack_exports, require) => {
+    const style = document.createElement("style");
+    style.innerHTML = require("./loader/less-loader.js!./src/index.less");
+    document.head.append(style);
+  },
+};
+```
