@@ -2162,3 +2162,244 @@ function defineLoaderContextGetters(loaderContext) {
 }
 module.exports = runLoaders;
 ```
+
+## webpack 插件机制
+
+- 在具体介绍webpack内置插件与钩子可视化工具之前，我们先来了解一下webpack中的插件机制。webpack实现插件的大体方式是：
+  - 创建：`webpack` 在其内部对象上创建各种钩子
+  - 注册：插件将自己的方法注册到对应的钩子上，交给`webpack`
+  - 调用：`webpack`编译过程中，会适时地触发相应钩子，因此也就触发了插件的方法。
+- webpack本质上是一种事件流机制，它的工作流程就是将各个插件串联起来，而实现这一切核心就是`tapable`，webpack中最核心的负责编译的`Compiler`和负责创建`bundle`的`Compilation`都是`tapable`的实例
+- 通过事件的注册和监听，触发`webpack`生命周期函数中的函数方法
+
+**tapable常用的**一般有9个钩子：
+Hook钩子类型可以分类同步和异步两种，异步又有并行和串行。
+
+```js
+const {
+  SyncHook,
+  SyncBailHook, // 同步有保险的钩子
+  SyncWaterfallHook, // 瀑布钩子
+  SyncLoopHook, // 循环钩子
+  AsyncParallelHook, // 并行异步钩子
+  AsyncParallelBailHook, // 并行保险异步钩子
+  AsyncSeriesHook, // 串行异步钩子
+  AsyncSeriesBailHook, // 串行保险异步
+  AsyncSeriesWaterfallHook, // 串行保险瀑布钩子
+  AsyncSeriesLoopHook,// 串行循环钩子
+} = require("tapable");
+```
+
+如果按照hook的返回值来分类，可以分为四种：
+
+1. `bail`：保险钩子，一个失败，则全失败。遇到第一个结果是 `result !== undefined` 则返回，不再继续执行下去。有`SyncBailHook，AsyncSeriesBailHook， AsyncParallelBailHook`。也就是不能有返回值，有返回值就停止执行了。这就跟谈对象一样，你谈对象可能有多个，但是当你结婚以后肯定不会再找一个新对象了。
+2. `loop`：循环钩子。会不停的执行所有的事件函数，直到所有的结果都是`undefined`。有`SyncLoopHook， AsyncSeriesLoopHook`。只要有一个事件函数的返回值不是`undefined`，就又回到第一个事件函数开始重新执行。
+3. `basic`：基础钩子，顺序依次执行，不关心返回值。
+4. `waterfall`：瀑布钩子，上一个钩子的执行结果是下一个的参数。只要上一个事件函数的返回值不是`undefined`，就会把返回值作为下一个事件函数的参数，有`SyncWaterfallHook, AsyncSeriesWaterfallHook`.如果第一个事件函数有返回值，但是第二个没有返回值，那么执行第三个事件函数的时候，第一个参数其实也是第一个事件函数的返回值的。
+
+### 几个钩子的使用
+
+#### SyncHook
+
+SyncHook是一个类 创建一个同步钩子的实例。可以传递一个数组，数组元素的个数表示将来传给事件函数的参数个数。通过tap方法注册钩子，call方法触发钩子的执行，当然可以给call方法传递参数，但是只会传递给事件函数在创建实例预先定义好的参数个数。
+
+```js
+const {
+  SyncHook,
+} = require("tapable");
+
+// SyncHook是一个类 创建一个同步钩子的实例
+const hook = new SyncHook(["name", "age"]);
+// 注册钩子
+hook.tap("1", (name, age) => {
+  console.log("-----------------", 1, name, age);
+});
+hook.tap("2", (name, age) => {
+  console.log("-----------------", 2, name, age);
+});
+// 触发钩子
+hook.call("zs", 22);
+```
+
+#### SyncBailHook
+
+使用方式和SyncHook完全一样。但是如果某个事件函数有返回值，则下面的钩子不在继续执行。
+
+```js
+const hook = new SyncBailHook(["name", "age"]);
+// 注册钩子
+hook.tap("1", (name, age) => {
+  console.log("-----------------", 1, name, age);
+});
+hook.tap("2", (name, age) => {
+  console.log("-----------------", 2, name, age);
+  // 有返回值 不在继续向下执行其他事件函数了
+  return "2";
+});
+hook.tap("3", (name, age) => {
+  console.log("-----------------", 3, name, age);
+});
+// 触发钩子
+hook.call("zs", 22);
+```
+
+#### SyncWaterfallHook
+
+还是和上面说的一样，使用方式是不变的。但是前一个事件函数有返回值，那就会类似于修改了传给call方法的参数，每次有返回值，都会覆盖掉第一个参数。
+
+```js
+const hook = new SyncWaterfallHook(["name", "age"]);
+// 注册钩子
+hook.tap("1", (name, age) => {
+  console.log("-----------------", 1, name, age);
+  // 当前钩子的返回值 会成为下一个事件函数参数的第一个
+  return "1->ls";
+});
+hook.tap("2", (name, age) => {
+  console.log("-----------------", 2, name, age);
+  // 有返回值下一个事件函数参数的第一个就是当前返回值 没有就还是上一个事件函数的返回值
+  return "2->ww";
+});
+hook.tap("3", (name, age) => {
+  console.log("-----------------", 3, name, age);
+});
+// 触发钩子
+hook.call("zs", 22);
+```
+
+#### SyncLoopHook
+
+该钩子如果某一个事件函数的返回值不是`undefined`，则会从头开始执行。
+可以猜测一下，下面的每个事件函数到底执行了几次？最后的打印次数是多少呢？
+
+```js
+const hook = new SyncLoopHook();
+let count1 = (count2 = count3 = 0);
+let sum = 0;
+// 注册钩子
+hook.tap("1", () => {
+  sum++;
+  console.log("1-----------------count1", count1);
+  if (++count1 === 1) {
+    count1 = 0;
+    // 返回undefined 继续执行下一个事件函数
+    return;
+  }
+  // 不是undefined 重新开始执行第一个事件函数
+  return true;
+});
+hook.tap("2", () => {
+  sum++;
+  console.log("2-----------------count2", count2);
+  if (++count2 === 2) {
+    count2 = 0;
+    return;
+  }
+  return true;
+});
+hook.tap("3", () => {
+  sum++;
+  console.log("3-----------------count3", count3);
+  if (++count3 === 3) {
+    count3 = 0;
+    return;
+  }
+  return true;
+});
+// 触发钩子
+hook.call();
+console.log("sum ->", sum); // ?
+```
+
+#### AsyncParallelHook
+
+我们使用该钩子一样可以进行同步注册，但是触发执行都是通过callAsync方法了。
+
+```js
+const hook = new AsyncParallelHook(["name", "age"]);
+// 同步注册
+hook.tap("1", (name, age) => {
+  console.log("1-----------------", name, age);
+});
+hook.tap("2", (name, age) => {
+  console.log("2-----------------", name, age);
+});
+hook.tap("3", (name, age) => {
+  console.log("3-----------------", name, age);
+});
+// 触发钩子 callAsync
+hook.callAsync("zs", 22, (err) => {
+  // 有错误 会执行该回调函数
+  console.log(err);
+});
+```
+
+异步注册钩子的方式：异步注册的钩子会同时执行，多个事件函数之间不会相互干扰，并行执行。传统的异步方式是采用回调函数的形式，如下例就是：
+
+```js
+console.time("start");
+// 异步注册
+hook.tapAsync("1", (name, age, callback) => {
+  setTimeout(() => {
+    console.log("1-----------------", name, age);
+    // callback参数是一个函数 调用该函数表示回调执行结束了
+    callback();
+  }, 1000);
+});
+hook.tapAsync("2", (name, age, callback) => {
+  setTimeout(() => {
+    console.log("2-----------------", name, age);
+    callback();
+  }, 2000);
+});
+hook.tapAsync("3", (name, age, callback) => {
+  setTimeout(() => {
+    console.log("3-----------------", name, age);
+    callback();
+    console.timeEnd("start"); // start: 3.013s
+  }, 3000);
+});
+// 触发钩子 callAsync
+hook.callAsync("zs", 22, (err) => {
+  // 有错误 会执行该回调函数
+  console.log("error->", err);
+});
+```
+
+当然执行异步的方式，我们也可以采用Promise的形式：使用tapPromise方法注册的事件函数的返回值是一个promise即可。当然，我们触发钩子的时候在上面使用的是callAsync方法，该方法也是以回调函数的形式来看其是否有错误产生，当然我们可以使用promise方法，这样就可以采用promise的链式调用的形式拿到最终的结果，看是否有错误产生。
+
+```js
+console.time("promise");
+// 异步注册 promise
+hook.tapPromise("1", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("1-----------------", name, age);
+      resolve();
+    }, 1000);
+  });
+});
+hook.tapPromise("2", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("2-----------------", name, age);
+      resolve();
+    }, 2000);
+  });
+});
+hook.tapPromise("3", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("3-----------------", name, age);
+      resolve();
+      console.timeEnd("promise"); // promise: 3.006s
+    }, 3000);
+  });
+});
+
+// 触发钩子 callAsync
+hook.promise("zs", 22).then((res) => {
+  // 有错误 会执行该回调函数
+  console.log("res->", res);
+});
+```
