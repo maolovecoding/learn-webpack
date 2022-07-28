@@ -2396,10 +2396,451 @@ hook.tapPromise("3", (name, age) => {
     }, 3000);
   });
 });
+hook.promise("zs", 22).then((res) => {
+  // 有错误 会执行该回调函数
+  console.log("res->", res);
+});
+```
 
+#### AsyncParallelBailHook
+
+只要有一个事件处理函数有返回值（相当于给回调函数传参，或者promise的resolve有接收值），那么整个钩子的promise就会成功或者失败。当然其他的事件函数因为是并行执行，所以异步的事件函数依然会执行。
+
+```js
+const hook = new AsyncParallelBailHook(["name", "age"]);
+console.time("promise");
+// 异步注册 promise
+hook.tapPromise("1", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("1-----------------", name, age);
+      // 只要有一个resolve有了返回值，触发函数的返回的promise就直接成功了
+      resolve("1---");
+    }, 1000);
+  });
+});
+hook.tapPromise("2", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("2-----------------", name, age);
+      resolve();
+    }, 2000);
+  });
+});
+hook.tapPromise("3", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("3-----------------", name, age);
+      resolve();
+      console.timeEnd("promise"); // promise: 3.006s
+    }, 3000);
+  });
+});
+hook.promise("zs", 22).then((res) => {
+  console.log("res->", res);
+});
+```
+
+#### AsyncSeriesHook
+
+常规串行执行，上一个事件函数处理完以后才会处理下一个事件函数。
+
+```js
+const hook = new AsyncSeriesHook(["name", "age"]);
+
+console.time("promise");
+hook.tapPromise("1", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("1-----------------", name, age);
+      resolve();
+    }, 1000);
+  });
+});
+hook.tapPromise("2", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("2-----------------", name, age);
+      resolve();
+    }, 2000);
+  });
+});
+hook.tapPromise("3", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("3-----------------", name, age);
+      resolve();
+      console.timeEnd("promise"); // promise: 6.032s
+    }, 3000);
+  });
+});
 // 触发钩子 callAsync
 hook.promise("zs", 22).then((res) => {
   // 有错误 会执行该回调函数
   console.log("res->", res);
 });
 ```
+
+#### AsyncSeriesBailHook
+
+用法还是没什么大的区别，只是对于串行的保险钩子，上一个事件函数有返回值的情况，后面的事件函数就不会执行了。且Promise也是直接拿到resolve结果了。
+
+```js
+const hook = new AsyncSeriesBailHook(["name", "age"]);
+
+console.time("promise");
+hook.tapPromise("1", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("1-----------------", name, age);
+      resolve();
+    }, 1000);
+  });
+});
+hook.tapPromise("2", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("2-----------------", name, age);
+      resolve("2---");
+    }, 2000);
+  });
+});
+hook.tapPromise("3", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("3-----------------", name, age);
+      resolve();
+      console.timeEnd("promise"); // 上一个事件函数有返回值了 不会执行到这里
+    }, 3000);
+  });
+});
+// 触发钩子 callAsync
+hook.promise("zs", 22).then((res) => {
+  // 有错误 会执行该回调函数
+  console.log("res->", res);
+});
+```
+
+#### AsyncSeriesWaterfallHook
+
+效果和前面同步的waterfall基本是一样的，但是要注意这里的下一个事件函数是不确定的，谁先执行谁就是下一个事件函数，因为是异步注册的事件函数，就看谁先执行了。
+
+```js
+const hook = new AsyncSeriesWaterfallHook(["name", "age"]);
+console.time("promise");
+hook.tapPromise("1", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("1-----------------", name, age);
+      // 返回值作为下一个执行的事件函数的第一个参数 效果和前面的同步钩子差不多
+      resolve("1---");
+    }, 1000);
+  });
+});
+hook.tapPromise("2", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("2-----------------", name, age);
+      // 有返回值 那么就会覆盖掉上一个执行的事件函数的返回值 没有的时候 当前事件函数的下一个要执行的事件函数的参数还是上一次的事件函数返回值
+      // resolve("2---");
+      resolve();
+    }, 2000);
+  });
+});
+hook.tapPromise("3", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("3-----------------", name, age);
+      resolve();
+      console.timeEnd("promise");
+    }, 3000);
+  });
+});
+hook.promise("zs", 22).then((res) => {
+  // 有错误 会执行该回调函数
+  console.log("res->", res);
+});
+```
+
+#### AsyncSeriesLoopHook
+
+异步的循环串行钩子其实和同步的循环钩子基本都是一致的，区别还是在于谁先执行，谁就是下一个事件函数，而不是按照注册顺序确定的。
+
+```js
+const hook = new AsyncSeriesLoopHook(["name", "age"]);
+
+let count1 = (count2 = count3 = 0);
+let sum = 0;
+hook.tapPromise("1", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      sum++;
+      console.log("1-----------------", name, age, count1);
+      if (++count1 === 1) {
+        count1 = 0;
+        resolve();
+      }
+      resolve("1---");
+    }, 1000);
+  });
+});
+hook.tapPromise("2", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      sum++;
+      console.log("2-----------------", name, age, count2);
+      if (++count2 === 2) {
+        count2 = 0;
+        resolve();
+      }
+      resolve("2---");
+    }, 2000);
+  });
+});
+hook.tapPromise("3", (name, age) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      sum++;
+      console.log("3-----------------", name, age, count3);
+      if (++count3 === 3) {
+        count3 = 0;
+        resolve();
+      }
+      resolve("3---");
+    }, 3000);
+  });
+});
+hook.promise("zs", 22).then((res) => {
+  console.log("res->", res, "sum->", sum);
+});
+
+```
+
+### 钩子的实现原理
+
+首先每个钩子都是一个类，用来创建钩子对象。可以接收一个参数，参数是数组，数组元素的个数就是将来可以传递给事件函数的参数个数。
+且再tapable内部，对于执行事件处理函数，可以认为是动态创建函数然后取出所有的事件函数执行的。比如：
+
+```js
+function sum(a,b){
+  return a+b;
+}
+// 动态创建
+const sum = new Function("a,b","return a+b")
+// 最后我们创建的函数可能是这种
+function anonymous(name,age
+) {
+
+    // header
+    var _x = this._x;
+
+    var _fn0 = _x[0];
+    _fn0(name,age);
+
+    var _fn1 = _x[1];
+    _fn1(name,age);
+
+}
+```
+
+也就是说，对于我们触发所有事件函数执行的那个call方法，实际上是触发时刻动态创建出来的。
+
+#### SyncHook的实现
+
+说了这么多，这个call函数是如何拼起来创建的？其实对于源码还是有点绕的。至于为什么要动态创建，主要是为了懒执行，以及不同的钩子实现方式会不一样，所以我们在基类钩子Hook里面是不能绝对call实际的执行方式的。因此，就采用了子类实现的方式，具体的创建方式交给子类，实际调用是父类完成。
+
+**Hook.js**:
+
+```js
+class Hook {
+  /**
+   *
+   * @param {Array} args
+   */
+  constructor(args = []) {
+    /**
+     * 事件函数形参列表
+     * @type {Array<string>}
+     */
+    this.args = args;
+    /**
+     * 存放事件函数
+     * @type {Array<{name:string,fn:Function,type:"sync"|"async"}>}
+     */
+    this.taps = [];
+    //  假的call方法 占位
+    this.call = CALL_DELEGATE;
+    // 将会存放要执行的事件处理函数
+    this._x = null;
+  }
+  /**
+   *
+   * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
+   * @param {Function} fn
+   */
+  tap(options, fn) {
+    this.#_tap("sync", options, fn);
+  }
+  /**
+   * @param {"sync"|"async"} type 调用类型
+   * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
+   * @param {Function} fn
+   */
+  #_tap(type, options, fn) {
+    if (typeof options === "string") {
+      options = { name: options };
+    }
+    // 两个属性 name fn
+    const tapInfo = { ...options, fn, type };
+    this.#insert(tapInfo);
+  }
+  /**
+   * 注册一个事件函数
+   * @param {{name:string,fn:Function,type:"sync"|"async"}} tapInfo
+   */
+  #insert(tapInfo) {
+    this.taps.push(tapInfo);
+  }
+  /**
+   * 触发事件函数的执行 事件函数的动态编译的
+   * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
+   * @param  {...any} args
+   */
+  // #call(options, ...args) {}
+  /**
+   *
+   * @param {"sync"|"async"} type
+   */
+  _createCall(type) {
+    // 执行编译 生成 call方法 交给子类实现的
+    return this.compile({
+      taps: this.taps,
+      args: this.args,
+      type,
+    });
+  }
+}
+const CALL_DELEGATE = function (...args) {
+  // 生成 call方法
+  this.call = this._createCall("sync");
+  // 执行
+  return this.call(...args);
+};
+
+module.exports = Hook;
+```
+
+**SyncHook**:
+
+```js
+const Hook = require("./Hook");
+const HookCodeFactory = require("./HookCodeFactory");
+
+class SyncHookCodeFactory extends HookCodeFactory {
+  content() {
+    // 调用父类的串行方法 执行taps
+    return this.callTapsSeries();
+  }
+}
+const factory = new SyncHookCodeFactory();
+class SyncHook extends Hook {
+  /**
+   *
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   */
+  compile(options) {
+    factory.setup(this, options);
+    return factory.create(options);
+  }
+}
+module.exports = SyncHook;
+```
+
+**HookCodeFactory**:
+
+```js
+const Hook = require("./Hook");
+/**
+ * 创建代码函数工厂
+ */
+class HookCodeFactory {
+  /**
+   *
+   * @param {Hook} hookInstance
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   */
+  setup(hookInstance, options) {
+    // 取出所有的事件处理函数 存放到 hook实例的 _x属性上
+    hookInstance._x = options.taps.map((tapInfo) => tapInfo.fn);
+  }
+  /**
+   *
+   * @returns {string} 拼形参数组
+   */
+  #args() {
+    const { args } = this.options;
+    return args.join(",");
+  }
+  #header() {
+    return `
+    // header
+    var _x = this._x;\n`;
+  }
+  callTapsSeries() {
+    const taps = this.options.taps;
+    let code = "";
+    for (let i = 0; i < taps.length; i++) {
+      const tapContent = this.#callTap(i);
+      code += tapContent;
+    }
+    return code;
+  }
+  #callTap(tapIndex) {
+    const tapInfo = this.options.taps[tapIndex];
+    let code = `
+    var _fn${tapIndex} = _x[${tapIndex}];
+    `;
+    switch (tapInfo.type) {
+      case "sync":
+        code += `_fn${tapIndex}(${this.#args()});\n`;
+        break;
+    }
+    return code;
+  }
+  /**
+   *
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   */
+  #init(options) {
+    this.options = options;
+  }
+  /**
+   *
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   */
+  create(options) {
+    // 初始化创建
+    this.#init(options);
+    let fn;
+    switch (this.options.type) {
+      case "sync":
+        // content方法 也就是具体的事件函数调用 会由子类实现
+        fn = new Function(this.#args(), this.#header() + this.content());
+        break;
+      case "async":
+        break;
+      default:
+        break;
+    }
+    // 销毁
+    this.#deInit();
+    return fn;
+  }
+  #deInit() {
+    this.options = null;
+  }
+}
+module.exports = HookCodeFactory;
+```
+
+实现方式就需要这三个核心文件，最后的效果和原生SyncHook一致。

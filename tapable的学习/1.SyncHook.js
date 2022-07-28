@@ -9,7 +9,7 @@ const {
   // AsyncSeriesBailHook, // 串行保险异步
   // AsyncSeriesWaterfallHook, // 串行保险瀑布钩子
   // AsyncSeriesLoopHook,// 串行循环钩子
-} = require("tapable");
+} = require("../tapable");
 
 // SyncHook是一个类 创建一个同步钩子的实例
 const hook = new SyncHook(["name", "age"]);
