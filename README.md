@@ -3118,3 +3118,201 @@ class AsyncParallelHook extends Hook {
 }
 module.exports = AsyncParallelHook;
 ```
+
+**当然**，并不是说上面的实现就是很完美的，如果我们每种注册方式和触发方式都分开使用，当然是OK的。可是如果混合使用的情况，那就不是很OK了。可以想想中间应该如何调用并执行？
+
+### interceptor
+
+- 所有的钩子都提供额外的拦截器API
+  - call：`(...args) => void`当你的钩子触发之前，就是call调用之前，就会触发这个函数，你可以访问钩子的参数，多个钩子执行一次。
+  - tap:`(tap:Tap)=>void` 每个钩子执行之前（多个钩子执行多个），就会触发这个函数
+  - register:`(tap:Tap)=> Tap | undefined`每添加一个Tap都会触发你`interceptor`上的`register`，你下一个拦截器的`register`函数得到的参数，取决于你上一个`register`返回的值，所以你最好返回一个`tap`钩子
+- Context(上下文)插件和拦截器都可以选择加入一个可选的context对象，这个可以被用于传递随意的值到队列中的插件和拦截器
+
+**拦截器的基本使用**：
+本质就是吧拦截器暂存起来，register就是在调用tap方法时进行执行，tap钩子就是在每次执行一个事件函数之前就执行一次tap函数，call拦截器就是在执行所有事件函数的第一个函数之前，执行一次。
+如果想要修改我们的tapInfo，也是可以在register的时候进行修改的，只要有返回值就会替换原来的。
+tapInfo中一般会记录当前注册的事件函数的类型name，事件函数，以及同步异步等信息。
+
+```js
+const hook = new SyncHook(["name", "age"]);
+// 注册拦截器
+hook.intercept({
+  // 当你触发一个新的回调的时候会触发 可以修改tapInfo的内容
+  register(tapInfo) {
+    console.log("拦截器1开始 register");
+    return tapInfo;
+  },
+  // 每次执行事件函数都会触发
+  tap(tapInfo) {
+    console.log("拦截器1的tap");
+  },
+  // 执行第一个事件函数前触发
+  call(name, age) {
+    console.log("拦截器1的call：", name, age);
+  },
+});
+hook.tap("1", (name, age) => {
+  console.log("-----------------", 1, name, age);
+});
+hook.tap("2", (name, age) => {
+  console.log("-----------------", 2, name, age);
+});
+hook.call("zs", 22);
+```
+
+### 拦截器的实现原理
+
+只需要修改部分代码就可以实现拦截器的功能。
+**Hook.js**:
+
+```js
+class Hook {
+  /**
+   *
+   * @param {Array} args
+   */
+  constructor(args = []) {
+    /**
+     * 事件函数形参列表
+     * @type {Array<string>}
+     */
+    this.args = args;
+    /**
+     * 存放事件函数
+     * @type {Array<{name:string,fn:Function,type:"sync"|"async"}>}
+     */
+    this.taps = [];
+    //  假的call方法 占位
+    this.call = CALL_DELEGATE;
+    this.callAsync = CALL_ASYNC_DELEGATE;
+    this.promise = PROMISE_DELEGATE;
+    // 将会存放要执行的事件处理函数
+    this._x = null;
+    // 拦截器数组
+    /**
+     * @type {Array<{tap:Function,call:Function,register:Function}>}
+     */
+    this.interceptors = [];
+  }
+  // .......
+  /**
+   * 注册拦截器
+   * @param {{tap:Function,call:Function,register:Function}} interceptor
+   */
+  intercept(interceptor) {
+    this.interceptors.push(interceptor);
+  }
+  /**
+   * @param {"sync"|"async"} type 调用类型
+   * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
+   * @param {Function} fn
+   */
+  #_tap(type, options, fn) {
+    if (typeof options === "string") {
+      options = { name: options };
+    }
+    // 两个属性 name fn
+    let tapInfo = { ...options, fn, type };
+    // 执行注册拦截器 register
+    tapInfo = this.#runRegisterInterceptors(tapInfo);
+    this.#insert(tapInfo);
+  }
+  /**
+   * 执行register拦截器 可以改变tapInfo的
+   * @param {{name:string,fn:Function,type:"sync"|"async"|"promise"}}} tapInfo
+   */
+  #runRegisterInterceptors(tapInfo) {
+    for (const interceptor of this.interceptors) {
+      if (typeof interceptor.register === "function") {
+        const newTapInfo = interceptor.register(tapInfo);
+        if (typeof newTapInfo !== "undefined") {
+          tapInfo = newTapInfo;
+        }
+      }
+    }
+    return tapInfo;
+  }
+  /**
+   *
+   * @param {"sync"|"async"} type
+   */
+  _createCall(type) {
+    // 执行编译 生成 call方法 交给子类实现的
+    return this.compile({
+      taps: this.taps,
+      args: this.args,
+      type,
+      interceptors: this.interceptors,
+    });
+  }
+}
+// ...
+```
+
+**HookCodeFactory.js**:
+
+```js
+const Hook = require("./Hook");
+/**
+ * 创建代码函数工厂
+ */
+class HookCodeFactory {
+  // ...
+  #header() {
+    const interceptors = this.options.interceptors;
+    let code = `
+    // header
+    var _x = this._x;\n`;
+    // 拦截器 call拦截器的实现
+    if (interceptors.length > 0) {
+      code += `var _taps = this.taps;
+      var _interceptors = this.interceptors;
+      `;
+      for (let k = 0; k < interceptors.length; k++) {
+        const interceptor = interceptors[k];
+        if (typeof interceptor.call === "function") {
+          code += `_interceptors[${k}].call(${this.#args()});\n`;
+        }
+      }
+    }
+    return code;
+  }
+  #callTap(tapIndex) {
+    const tapInfo = this.options.taps[tapIndex];
+    let code = `var _tap${tapIndex} = _taps[${tapIndex}];\n`;
+    const interceptors = this.options.interceptors;
+    for (let i = 0; i < interceptors.length; i++) {
+      const interceptor = interceptors[i];
+      if (interceptor.tap) {
+        code += `_interceptors[${i}].tap(_tap${tapIndex});\n`;
+      }
+    }
+    code += `
+    var _fn${tapIndex} = _x[${tapIndex}];
+    `;
+    switch (tapInfo.type) {
+      case "sync":
+        code += `_fn${tapIndex}(${this.#args()});\n`;
+        break;
+      case "async":
+        code += `_fn${tapIndex}(${this.#args()}, (function (){
+          if(--_counter === 0) _done();
+        }));\n`;
+        break;
+      case "promise":
+        code += `
+          var _promise${tapIndex} = _fn${tapIndex}(${this.#args()});
+          _promise${tapIndex}.then(() => {
+            if(--_counter === 0) _done();
+          });
+        `;
+        break;
+    }
+    return code;
+  }
+}
+module.exports = HookCodeFactory;
+```
+
+**对于需要修改代码的地方我已经指出**，无非就是在特定的执行时机插入相关的拦截器进行执行。就是我们常说的AOP。

@@ -6,7 +6,7 @@ class HookCodeFactory {
   /**
    *
    * @param {Hook} hookInstance
-   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[],interceptors:any[]}} options
    */
   setup(hookInstance, options) {
     // 取出所有的事件处理函数 存放到 hook实例的 _x属性上
@@ -25,9 +25,23 @@ class HookCodeFactory {
     return allArgs.join(", ");
   }
   #header() {
-    return `
+    const interceptors = this.options.interceptors;
+    let code = `
     // header
     var _x = this._x;\n`;
+    // 拦截器 call拦截器的实现
+    if (interceptors.length > 0) {
+      code += `var _taps = this.taps;
+      var _interceptors = this.interceptors;
+      `;
+      for (let k = 0; k < interceptors.length; k++) {
+        const interceptor = interceptors[k];
+        if (typeof interceptor.call === "function") {
+          code += `_interceptors[${k}].call(${this.#args()});\n`;
+        }
+      }
+    }
+    return code;
   }
   /**
    * 串行
@@ -62,7 +76,15 @@ class HookCodeFactory {
   }
   #callTap(tapIndex) {
     const tapInfo = this.options.taps[tapIndex];
-    let code = `
+    let code = `var _tap${tapIndex} = _taps[${tapIndex}];\n`;
+    const interceptors = this.options.interceptors;
+    for (let i = 0; i < interceptors.length; i++) {
+      const interceptor = interceptors[i];
+      if (interceptor.tap) {
+        code += `_interceptors[${i}].tap(_tap${tapIndex});\n`;
+      }
+    }
+    code += `
     var _fn${tapIndex} = _x[${tapIndex}];
     `;
     switch (tapInfo.type) {
@@ -87,7 +109,7 @@ class HookCodeFactory {
   }
   /**
    *
-   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[],interceptors:any[]}} options
    */
   #init(options) {
     this.options = options;

@@ -20,6 +20,11 @@ class Hook {
     this.promise = PROMISE_DELEGATE;
     // 将会存放要执行的事件处理函数
     this._x = null;
+    // 拦截器数组
+    /**
+     * @type {Array<{tap:Function,call:Function,register:Function}>}
+     */
+    this.interceptors = [];
   }
   /**
    *
@@ -36,6 +41,13 @@ class Hook {
     this.#_tap("promise", options, fn);
   }
   /**
+   * 注册拦截器
+   * @param {{tap:Function,call:Function,register:Function}} interceptor
+   */
+  intercept(interceptor) {
+    this.interceptors.push(interceptor);
+  }
+  /**
    * @param {"sync"|"async"} type 调用类型
    * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
    * @param {Function} fn
@@ -45,8 +57,25 @@ class Hook {
       options = { name: options };
     }
     // 两个属性 name fn
-    const tapInfo = { ...options, fn, type };
+    let tapInfo = { ...options, fn, type };
+    // 执行注册拦截器 register
+    tapInfo = this.#runRegisterInterceptors(tapInfo);
     this.#insert(tapInfo);
+  }
+  /**
+   * 执行register拦截器 可以改变tapInfo的
+   * @param {{name:string,fn:Function,type:"sync"|"async"|"promise"}}} tapInfo
+   */
+  #runRegisterInterceptors(tapInfo) {
+    for (const interceptor of this.interceptors) {
+      if (typeof interceptor.register === "function") {
+        const newTapInfo = interceptor.register(tapInfo);
+        if (typeof newTapInfo !== "undefined") {
+          tapInfo = newTapInfo;
+        }
+      }
+    }
+    return tapInfo;
   }
   /**
    * 注册一个事件函数
@@ -71,9 +100,11 @@ class Hook {
       taps: this.taps,
       args: this.args,
       type,
+      interceptors: this.interceptors,
     });
   }
 }
+
 // 同步代理
 const CALL_DELEGATE = function (...args) {
   // 生成 call方法
