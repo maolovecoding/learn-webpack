@@ -2844,3 +2844,277 @@ module.exports = HookCodeFactory;
 ```
 
 实现方式就需要这三个核心文件，最后的效果和原生SyncHook一致。
+
+#### AsyncParallelHook实现原理
+
+其实异步的实现，有点类似于promise.all方法，所有的事件函数都处理完毕，那就调用最终的回调函数。
+我们注册事件函数，可以使用同步方式`tap,call`，也可以使用回调异步的方式`tapAsync, callAsync`，也可以使用`tapPromise , promise`的形式。我们也可以实现一下其核心原理，最后的效果也是可以的。
+
+这里就直接上干货了，不多哔哔废话，对于注释写的也是很清晰的。
+**Hook.js**:
+
+```js
+class Hook {
+  /**
+   *
+   * @param {Array} args
+   */
+  constructor(args = []) {
+    /**
+     * 事件函数形参列表
+     * @type {Array<string>}
+     */
+    this.args = args;
+    /**
+     * 存放事件函数
+     * @type {Array<{name:string,fn:Function,type:"sync"|"async"}>}
+     */
+    this.taps = [];
+    //  假的call方法 占位
+    this.call = CALL_DELEGATE;
+    this.callAsync = CALL_ASYNC_DELEGATE;
+    this.promise = PROMISE_DELEGATE;
+    // 将会存放要执行的事件处理函数
+    this._x = null;
+  }
+  /**
+   *
+   * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
+   * @param {Function} fn
+   */
+  tap(options, fn) {
+    this.#_tap("sync", options, fn);
+  }
+  tapAsync(options, fn) {
+    this.#_tap("async", options, fn);
+  }
+  tapPromise(options, fn) {
+    this.#_tap("promise", options, fn);
+  }
+  /**
+   * @param {"sync"|"async"} type 调用类型
+   * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
+   * @param {Function} fn
+   */
+  #_tap(type, options, fn) {
+    if (typeof options === "string") {
+      options = { name: options };
+    }
+    // 两个属性 name fn
+    const tapInfo = { ...options, fn, type };
+    this.#insert(tapInfo);
+  }
+  /**
+   * 注册一个事件函数
+   * @param {{name:string,fn:Function,type:"sync"|"async"}} tapInfo
+   */
+  #insert(tapInfo) {
+    this.taps.push(tapInfo);
+  }
+  /**
+   * 触发事件函数的执行 事件函数的动态编译的
+   * @param {string|{name:string}} options 可以直接是字符串名字 也可以是对象 有name属性
+   * @param  {...any} args
+   */
+  // #call(options, ...args) {}
+  /**
+   *
+   * @param {"sync"|"async"} type
+   */
+  _createCall(type) {
+    // 执行编译 生成 call方法 交给子类实现的
+    return this.compile({
+      taps: this.taps,
+      args: this.args,
+      type,
+    });
+  }
+}
+// 同步代理
+const CALL_DELEGATE = function (...args) {
+  // 生成 call方法
+  this.call = this._createCall("sync");
+  // 执行
+  return this.call(...args);
+};
+// 异步代理
+const CALL_ASYNC_DELEGATE = function (...args) {
+  // 生成 call方法
+  this.callAsync = this._createCall("async");
+  // 执行
+  return this.callAsync(...args);
+};
+// promise
+const PROMISE_DELEGATE = function (...args) {
+  // 生成 call方法
+  this.promise = this._createCall("promise");
+  // 执行
+  return this.promise(...args);
+};
+
+module.exports = Hook;
+```
+
+**HookCodeFactory.js**:
+
+```js
+const Hook = require("./Hook");
+/**
+ * 创建代码函数工厂
+ */
+class HookCodeFactory {
+  /**
+   *
+   * @param {Hook} hookInstance
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   */
+  setup(hookInstance, options) {
+    // 取出所有的事件处理函数 存放到 hook实例的 _x属性上
+    hookInstance._x = options.taps.map((tapInfo) => tapInfo.fn);
+  }
+  /**
+   *
+   * @returns {string} 拼形参数组
+   */
+  #args({ after } = {}) {
+    const { args } = this.options;
+    const allArgs = args.slice(0);
+    if (after) {
+      allArgs.push(after);
+    }
+    return allArgs.join(", ");
+  }
+  #header() {
+    return `
+    // header
+    var _x = this._x;\n`;
+  }
+  /**
+   * 串行
+   * @returns
+   */
+  callTapsSeries() {
+    const taps = this.options.taps;
+    let code = "";
+    for (let i = 0; i < taps.length; i++) {
+      const tapContent = this.#callTap(i);
+      code += tapContent;
+    }
+    return code;
+  }
+  /**
+   * 并行的执行taps
+   */
+  callTapsParallel({ onDone } = { onDone: () => "_callback();" }) {
+    const taps = this.options.taps;
+    let code = `var _counter = ${taps.length};`;
+    code += `
+    var _done = (function (){
+      // _callback();
+      ${onDone()}
+    });
+    `;
+    for (let i = 0; i < taps.length; i++) {
+      const tapContent = this.#callTap(i);
+      code += tapContent;
+    }
+    return code;
+  }
+  #callTap(tapIndex) {
+    const tapInfo = this.options.taps[tapIndex];
+    let code = `
+    var _fn${tapIndex} = _x[${tapIndex}];
+    `;
+    switch (tapInfo.type) {
+      case "sync":
+        code += `_fn${tapIndex}(${this.#args()});\n`;
+        break;
+      case "async":
+        code += `_fn${tapIndex}(${this.#args()}, (function (){
+          if(--_counter === 0) _done();
+        }));\n`;
+        break;
+      case "promise":
+        code += `
+          var _promise${tapIndex} = _fn${tapIndex}(${this.#args()});
+          _promise${tapIndex}.then(() => {
+            if(--_counter === 0) _done();
+          });
+        `;
+        break;
+    }
+    return code;
+  }
+  /**
+   *
+   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   */
+  #init(options) {
+    this.options = options;
+  }
+  /**
+   *
+   * @param {{type:"sync"|"async"|"promise",taps:Array<Function>, args:string[]}} options
+   */
+  create(options) {
+    // 初始化创建
+    this.#init(options);
+    let fn;
+    switch (this.options.type) {
+      case "sync":
+        // content方法 也就是具体的事件函数调用 会由子类实现
+        fn = new Function(this.#args(), this.#header() + this.content());
+        break;
+      case "async":
+        // 追加一个形参 _callback 也可以认为是next函数 执行就调用下一个事件函数
+        fn = new Function(
+          this.#args({ after: "_callback" }),
+          this.#header() + this.content({ onDone: () => "_callback();\n" })
+        );
+        break;
+      case "promise":
+        const tapsContent = this.content({ onDone: () => "resolve();\n" });
+        let content = `
+        return new Promise((resolve, reject) => {
+          ${tapsContent}
+        });
+        `;
+        fn = new Function(this.#args(), this.#header() + content);
+        break;
+      default:
+        break;
+    }
+    // 销毁
+    this.#deInit();
+    return fn;
+  }
+  #deInit() {
+    this.options = null;
+  }
+}
+module.exports = HookCodeFactory;
+```
+
+**AsyncParallelHook.js**:
+
+```js
+const Hook = require("./Hook");
+const HookCodeFactory = require("./HookCodeFactory");
+class AsyncParallelHookCodeFactory extends HookCodeFactory {
+  content({ onDone } = { onDone: () => "_callback();" }) {
+    // 并行
+    return this.callTapsParallel({ onDone });
+  }
+}
+const factory = new AsyncParallelHookCodeFactory();
+/**
+ * 异步并行钩子
+ */
+class AsyncParallelHook extends Hook {
+  compile(options) {
+    factory.setup(this, options);
+    return factory.create(options);
+  }
+}
+module.exports = AsyncParallelHook;
+```

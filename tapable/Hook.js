@@ -16,6 +16,8 @@ class Hook {
     this.taps = [];
     //  假的call方法 占位
     this.call = CALL_DELEGATE;
+    this.callAsync = CALL_ASYNC_DELEGATE;
+    this.promise = PROMISE_DELEGATE;
     // 将会存放要执行的事件处理函数
     this._x = null;
   }
@@ -26,6 +28,12 @@ class Hook {
    */
   tap(options, fn) {
     this.#_tap("sync", options, fn);
+  }
+  tapAsync(options, fn) {
+    this.#_tap("async", options, fn);
+  }
+  tapPromise(options, fn) {
+    this.#_tap("promise", options, fn);
   }
   /**
    * @param {"sync"|"async"} type 调用类型
@@ -66,11 +74,26 @@ class Hook {
     });
   }
 }
+// 同步代理
 const CALL_DELEGATE = function (...args) {
   // 生成 call方法
   this.call = this._createCall("sync");
   // 执行
   return this.call(...args);
+};
+// 异步代理
+const CALL_ASYNC_DELEGATE = function (...args) {
+  // 生成 call方法
+  this.callAsync = this._createCall("async");
+  // 执行
+  return this.callAsync(...args);
+};
+// promise
+const PROMISE_DELEGATE = function (...args) {
+  // 生成 call方法
+  this.promise = this._createCall("promise");
+  // 执行
+  return this.promise(...args);
 };
 
 module.exports = Hook;

@@ -9,7 +9,7 @@ const {
   // AsyncSeriesBailHook, // 串行保险异步
   // AsyncSeriesWaterfallHook, // 串行保险瀑布钩子
   // AsyncSeriesLoopHook,// 串行循环钩子
-} = require("tapable");
+} = require("../tapable");
 
 const hook = new AsyncParallelHook(["name", "age"]);
 // 同步注册

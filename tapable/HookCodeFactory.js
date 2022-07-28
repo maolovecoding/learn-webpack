@@ -16,18 +16,44 @@ class HookCodeFactory {
    *
    * @returns {string} 拼形参数组
    */
-  #args() {
+  #args({ after } = {}) {
     const { args } = this.options;
-    return args.join(",");
+    const allArgs = args.slice(0);
+    if (after) {
+      allArgs.push(after);
+    }
+    return allArgs.join(", ");
   }
   #header() {
     return `
     // header
     var _x = this._x;\n`;
   }
+  /**
+   * 串行
+   * @returns
+   */
   callTapsSeries() {
     const taps = this.options.taps;
     let code = "";
+    for (let i = 0; i < taps.length; i++) {
+      const tapContent = this.#callTap(i);
+      code += tapContent;
+    }
+    return code;
+  }
+  /**
+   * 并行的执行taps
+   */
+  callTapsParallel({ onDone } = { onDone: () => "_callback();" }) {
+    const taps = this.options.taps;
+    let code = `var _counter = ${taps.length};`;
+    code += `
+    var _done = (function (){
+      // _callback();
+      ${onDone()}
+    });
+    `;
     for (let i = 0; i < taps.length; i++) {
       const tapContent = this.#callTap(i);
       code += tapContent;
@@ -43,6 +69,19 @@ class HookCodeFactory {
       case "sync":
         code += `_fn${tapIndex}(${this.#args()});\n`;
         break;
+      case "async":
+        code += `_fn${tapIndex}(${this.#args()}, (function (){
+          if(--_counter === 0) _done();
+        }));\n`;
+        break;
+      case "promise":
+        code += `
+          var _promise${tapIndex} = _fn${tapIndex}(${this.#args()});
+          _promise${tapIndex}.then(() => {
+            if(--_counter === 0) _done();
+          });
+        `;
+        break;
     }
     return code;
   }
@@ -55,7 +94,7 @@ class HookCodeFactory {
   }
   /**
    *
-   * @param {{type:"sync"|"async",taps:Array<Function>, args:string[]}} options
+   * @param {{type:"sync"|"async"|"promise",taps:Array<Function>, args:string[]}} options
    */
   create(options) {
     // 初始化创建
@@ -67,6 +106,20 @@ class HookCodeFactory {
         fn = new Function(this.#args(), this.#header() + this.content());
         break;
       case "async":
+        // 追加一个形参 _callback 也可以认为是next函数 执行就调用下一个事件函数
+        fn = new Function(
+          this.#args({ after: "_callback" }),
+          this.#header() + this.content({ onDone: () => "_callback();\n" })
+        );
+        break;
+      case "promise":
+        const tapsContent = this.content({ onDone: () => "resolve();\n" });
+        let content = `
+        return new Promise((resolve, reject) => {
+          ${tapsContent}
+        });
+        `;
+        fn = new Function(this.#args(), this.#header() + content);
         break;
       default:
         break;
