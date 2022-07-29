@@ -54,10 +54,10 @@ class Hook {
    */
   #_tap(type, options, fn) {
     if (typeof options === "string") {
-      options = { name: options };
+      options = { name: options, stage: Number.MAX_SAFE_INTEGER };
     }
-    // 两个属性 name fn
-    let tapInfo = { ...options, fn, type };
+    // 两个属性 name fn type stage属性 默认值 MAX_INTEGER
+    let tapInfo = { stage: Number.MAX_SAFE_INTEGER, ...options, fn, type };
     // 执行注册拦截器 register
     tapInfo = this.#runRegisterInterceptors(tapInfo);
     this.#insert(tapInfo);
@@ -79,10 +79,23 @@ class Hook {
   }
   /**
    * 注册一个事件函数
-   * @param {{name:string,fn:Function,type:"sync"|"async"}} tapInfo
+   * @param {{name:string,fn:Function,type:"sync"|"async",stage:number}} tapInfo
    */
   #insert(tapInfo) {
-    this.taps.push(tapInfo);
+    // TODO 有stage进行插入排序 默认全都有了
+    let i = this.taps.length;
+    if (!i) {
+      this.taps.push(tapInfo);
+      return;
+    }
+    while (i--) {
+      if (this.taps[i].stage <= tapInfo.stage) {
+        this.taps[i + 1] = tapInfo;
+        break;
+      } else {
+        this.taps[i + 1] = this.taps[i];
+      }
+    }
   }
   /**
    * 触发事件函数的执行 事件函数的动态编译的

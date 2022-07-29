@@ -3407,3 +3407,85 @@ module.exports = HookMap;
 **为什么要创建一组hook？**：
 首先有明白，在一个前端工程化的项目中，很明显会有不同类型的文件，`js,ts,jsx,tsx,vue,png,json`等不同类型文件。
 在webpack中，每一个文件都是模块，但是不同的文件是不同的模块，不同的模块对应不同的模块工厂，不同的模块工厂会对应不同的钩子。
+
+## stage
+
+比如我们写一些回调函数，webpack打包会分成很多阶段：
+
+1. 分析参数
+2. 创建模块
+3. 生成chunk
+4. 生成文件
+
+就例如我们的loader，实际项目中可能是由多个配置文件合并在一起的，我们很难完全规定书写的顺序。`pre post normal inline`等的出现其实也是为了解决这种问题
+
+所以我们注册插件，或者说钩子的事件函数的注册，也是可以指定优先级，state越小，优先级越高。越是先执行相关的事件函数。
+
+```js
+const { SyncHook } = require("tapable");
+
+const hook = new SyncHook(["name"]);
+// 注册的顺序和执行的顺序不一致 可以有优先级的概念 那就用到了stage属性了
+hook.tap({ name: "tap1", stage: 1 }, (name) => {
+  console.log(name, "-----------", "tap1");
+});
+
+hook.tap({ name: "tap3", stage: 3 }, (name) => {
+  console.log(name, "-----------", "tap3");
+});
+
+hook.tap({ name: "tap5", stage: 5 }, (name) => {
+  console.log(name, "-----------", "tap5");
+});
+
+hook.tap({ name: "tap2", stage: 2 }, (name) => {
+  console.log(name, "-----------", "tap2");
+});
+
+hook.call("zs");
+/**
+ *  zs ----------- tap1
+    zs ----------- tap2
+    zs ----------- tap3
+    zs ----------- tap5
+ */
+```
+
+### state的原理
+
+其实原理很简单，就是缓存事件函数的时候，每次注册的同时进行一下排序就行了。最简单的当然就是插入排序了。
+
+修改Hook.js的一些代码：
+
+```js
+class Hook{
+  #_tap(type, options, fn) {
+    if (typeof options === "string") {
+      options = { name: options, stage: Number.MAX_SAFE_INTEGER };
+    }
+    // 两个属性 name fn type stage属性 默认值 MAX_INTEGER
+    let tapInfo = { stage: Number.MAX_SAFE_INTEGER, ...options, fn, type };
+    // 执行注册拦截器 register
+    tapInfo = this.#runRegisterInterceptors(tapInfo);
+    this.#insert(tapInfo);
+  }
+  #insert(tapInfo) {
+    // TODO 有stage进行插入排序 默认全都有了
+    let i = this.taps.length;
+    if (!i) {
+      this.taps.push(tapInfo);
+      return;
+    }
+    while (i--) {
+      if (this.taps[i].stage <= tapInfo.stage) {
+        this.taps[i + 1] = tapInfo;
+        break;
+      } else {
+        this.taps[i + 1] = this.taps[i];
+      }
+    }
+  }
+}
+```
+
+其实就是排个序而已，没什么难度。
