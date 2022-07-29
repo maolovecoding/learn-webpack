@@ -3489,3 +3489,38 @@ class Hook{
 ```
 
 其实就是排个序而已，没什么难度。
+
+### before
+
+有时候，我们的事件函数的执行，并不知道会在什么时机，也不知道应该在哪个stage的时候要执行。但如果知道要在哪个事件函数之前，或者多个事件函数之前执行，那么我们可以使用before属性来指定当前事件函数在其他事件函数之前执行。
+
+打个比方，你不知道你leader的工资是多少，突然你遇到一个神仙，他说可以实现你一个愿望，你虽然不知道leader到底挣多少钱，但是肯定比你多，所以你就可以许愿挣钱比leader更多。
+
+如下的例子，就是tap2在tap5前执行，然后顺序执行tap1，tap3.
+
+```js
+const { SyncHook } = require("tapable");
+const hook = new SyncHook(["name"]);
+// 注册的顺序和执行的顺序不一致 可以有优先级的概念 那就用到了stage属性了
+hook.tap({ name: "tap1" }, (name) => {
+  console.log(name, "-----------", "tap1");
+});
+hook.tap({ name: "tap3" }, (name) => {
+  console.log(name, "-----------", "tap3");
+});
+hook.tap({ name: "tap5", before: ["tap1", "tap3"] }, (name) => {
+  console.log(name, "-----------", "tap5");
+});
+hook.tap({ name: "tap2", before: ["tap5"] }, (name) => {
+  console.log(name, "-----------", "tap2");
+});
+hook.call("zs");
+/**
+  zs ----------- tap2
+  zs ----------- tap5
+  zs ----------- tap1
+  zs ----------- tap3
+ */
+```
+
+当然这个的实现其实也很简单，比如弄个set啥的来处理就好了。。不再哔哔。

@@ -79,9 +79,10 @@ class Hook {
   }
   /**
    * 注册一个事件函数
-   * @param {{name:string,fn:Function,type:"sync"|"async",stage:number}} tapInfo
+   * @param {{name:string,fn:Function,type:"sync"|"async",stage:number,before:string[]|string}} tapInfo
    */
   #insert(tapInfo) {
+    // TODO 可以做before
     // TODO 有stage进行插入排序 默认全都有了
     let i = this.taps.length;
     if (!i) {
