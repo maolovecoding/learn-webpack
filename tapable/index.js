@@ -1,7 +1,9 @@
 const SyncHook = require("./SyncHook");
 const AsyncParallelHook = require("./AsyncParallelHook");
+const HookMap = require("./HookMap");
 module.exports = {
   SyncHook,
+  HookMap,
   // SyncBailHook, // 同步有保险的钩子
   // SyncWaterfallHook, // 瀑布钩子
   // SyncLoopHook, // 循环钩子

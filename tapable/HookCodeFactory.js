@@ -76,12 +76,15 @@ class HookCodeFactory {
   }
   #callTap(tapIndex) {
     const tapInfo = this.options.taps[tapIndex];
-    let code = `var _tap${tapIndex} = _taps[${tapIndex}];\n`;
+    let code = "";
     const interceptors = this.options.interceptors;
-    for (let i = 0; i < interceptors.length; i++) {
-      const interceptor = interceptors[i];
-      if (interceptor.tap) {
-        code += `_interceptors[${i}].tap(_tap${tapIndex});\n`;
+    if (interceptors.length) {
+      code = `var _tap${tapIndex} = _taps[${tapIndex}];\n`;
+      for (let i = 0; i < interceptors.length; i++) {
+        const interceptor = interceptors[i];
+        if (interceptor.tap) {
+          code += `_interceptors[${i}].tap(_tap${tapIndex});\n`;
+        }
       }
     }
     code += `

@@ -3121,6 +3121,8 @@ module.exports = AsyncParallelHook;
 
 **当然**，并不是说上面的实现就是很完美的，如果我们每种注册方式和触发方式都分开使用，当然是OK的。可是如果混合使用的情况，那就不是很OK了。可以想想中间应该如何调用并执行？
 
+## 拦截器 interceptor
+
 ### interceptor
 
 - 所有的钩子都提供额外的拦截器API
@@ -3316,3 +3318,92 @@ module.exports = HookCodeFactory;
 ```
 
 **对于需要修改代码的地方我已经指出**，无非就是在特定的执行时机插入相关的拦截器进行执行。就是我们常说的AOP。
+
+## HookMap
+
+可以帮助我们批量创建hook钩子。
+该类实例化需要传入一个工厂函数，函数的返回值就是实例化的hook对象。每次调用hookMap实例化对象的for方法，都回去找其内部有没有已经创建好的同名hook，没有就重新创建，有就可以复用。
+
+```js
+const { SyncHook, HookMap, AsyncParallelHook } = require("tapable");
+
+const keyedHookMap = new HookMap(() => new SyncHook(["name"]));
+keyedHookMap
+  .for("key1")
+  .tap("plugin1", (name) => console.log(name, "---------"));
+keyedHookMap
+  .for("key1")
+  .tap("plugin2", (name) => console.log(name, "---------"));
+keyedHookMap
+  .for("key2")
+  .tap("plugin1", (name) => console.log(name, "---------"));
+keyedHookMap
+  .for("key2")
+  .tap("plugin2", (name) => console.log(name, "---------"));
+
+keyedHookMap.for("key1").call("zs");
+keyedHookMap.for("key2").call("ls");
+
+const keyedHookMap2 = new HookMap(() => new AsyncParallelHook(["name"]));
+console.time("async");
+keyedHookMap2.for("key3").tapAsync("plugin1", (name, next) => {
+  setTimeout(() => {
+    console.log(name, "---------");
+    next();
+  }, 1000);
+});
+keyedHookMap2.for("key3").tapAsync("plugin2", (name, next) => {
+  setTimeout(() => {
+    console.log(name, "---------");
+    next();
+  }, 2000);
+});
+keyedHookMap2.for("key3").tapAsync("plugin3", (name, next) => {
+  setTimeout(() => {
+    console.log(name, "---------");
+    next();
+    console.timeEnd("async");
+  }, 3000);
+});
+
+keyedHookMap2.for("key3").callAsync("zs", (err) => {
+  console.log(err);
+});
+```
+
+使用方式并没有什么难度。
+
+### HookMap的原理
+
+学过前面的东西，这玩意就很容易了。
+
+```js
+class HookMap {
+  #map = new Map();
+  #factory;
+  constructor(hookFactory) {
+    this.#factory = hookFactory;
+  }
+  for(key) {
+    const hook = this.get(key);
+    if (hook) return hook;
+    const newHook = this.#factory();
+    this.#map.set(key, newHook);
+    return newHook;
+  }
+  get(key) {
+    return this.#map.get(key);
+  }
+  tapAsync(key, options, fn){
+    return this.for(key).tapAsync(options, fn)
+  }
+  tapPromise(key, options, fn){
+    return this.for(key).tapPromise(options, fn)
+  }
+}
+module.exports = HookMap;
+```
+
+**为什么要创建一组hook？**：
+首先有明白，在一个前端工程化的项目中，很明显会有不同类型的文件，`js,ts,jsx,tsx,vue,png,json`等不同类型文件。
+在webpack中，每一个文件都是模块，但是不同的文件是不同的模块，不同的模块对应不同的模块工厂，不同的模块工厂会对应不同的钩子。
