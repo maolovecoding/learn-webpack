@@ -3524,3 +3524,92 @@ hook.call("zs");
 ```
 
 当然这个的实现其实也很简单，比如弄个set啥的来处理就好了。。不再哔哔。
+
+## plugin
+
+做了那么多铺垫，来到了插件环节了。
+插件向第三方开发者提供了webpack引擎中完整的能力。使用阶段式的构建回调，开发者可以引入他们自己的行为到webpack构建流程中。创建插件比创建`loader`更加**高级**，因为你将需要理解一些webpack底层的内部特性来做相应的钩子。
+
+### 为什么需要插件
+
+- `webpack`基础配置无法满足要求
+- 插件几乎能够任意修改webpack编译结果
+- `webpack`内部也是通过大量的内部插件实现的
+
+### 可以加载插件的常用对象
+
+对象：
+
+1. Compiler：`run`，`compile`，`compilation`, `make`, `emit`,`done`
+2. Compilation：buildModule，normalModuleLoader，succeedModule，finishModules，seal，optimize，after-seal
+3. Module Factory：beforeResolver，afterResolver，module，parser
+
+模块：Module
+
+1. Parser：program，statement，call，expression
+2. Template：hash，bootstrap，localVars，render
+
+### 创建插件
+
+一个最简单的插件就是一个类，有一个apply方法。
+
+```js
+class WebpackDonePlugin {
+  constructor(options) {
+    this.options = options;
+  }
+  apply(compiler) {
+    // 同步调用
+    console.log("webpack done plugin -----------");
+    // 注册异步回调
+    compiler.hooks.done.tapAsync("WebpackDonePlugin", (stats, callback) => {
+      // stats 本次编译的结果 modules chunks entries assets filenames
+      console.log(stats);
+      callback()
+    });
+  }
+}
+module.exports = WebpackDonePlugin;
+```
+
+### Compiler 和 Compilation
+
+在插件开发中最重要的两个资源就是 `compiler`和`compilation`对象。理解他们的角色是扩展`webpack`引擎的重要的第一步。
+
+- compiler 对象代表了完整的`webpack`环境配置。这个对象在启动webpack时被一次性建立，并配置好所有可操作的设置，包括options，loader和plugin。当在webpack环境中应用一个插件时，插件将收到此compiler对象的引用。可以使用它来访问webpack的主环境。
+- `compilation`对象代表了一次资源版本构建。当运行 `webpack`开发环境中间件时，每当检测到文件的变化，就会创建一个新的`compilation`，从而生成一组新的编译资源。一个`compilation`对象表现了当前的模块资源，编译生成资源，变化的文件，以及被跟踪依赖的状态信息。`compilation`对象也提供许多关机时机的回调，以供插件做自定义处理时选择使用。
+
+### 基本插件架构
+
+- 插件是由`[具有apply方法的prototype对象]`所实例化出来的
+- 这个 `apply`方法安装插件时，会被`webpack compiler`调用一次
+- apply方法可以接收到`webpack compiler`对象的引用，从而可以在回调函数中访问到`compiler`对象
+
+### 编写插件
+
+一个可以输出打包后chunk的id和name等的插件：
+
+```js
+/**
+ * 打印本次产出的代码块和文件
+ */
+class WebpackAssetsPlugin {
+  constructor(options) {
+    this.options = options;
+  }
+  apply(compiler) {
+    // 每当webpack开启一次新的编译 就会创建一个新的compilation
+    compiler.hooks.compilation.tap("WebpackAssetsPlugin", (compilation) => {
+      // 每当根据chunk创建一个新的文件后 会触发一次chunkAsset钩子
+      compilation.hooks.chunkAsset.tap(
+        "WebpackAssetsPlugin",
+        (chunk, filename) => {
+          // 代码块的 name 或者 id filename是打包的名字
+          console.log(chunk.name || chunk.id, filename);
+        }
+      );
+    });
+  }
+}
+module.exports = WebpackAssetsPlugin;
+``
