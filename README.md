@@ -3612,4 +3612,97 @@ class WebpackAssetsPlugin {
   }
 }
 module.exports = WebpackAssetsPlugin;
-``
+```
+
+
+
+### 打包资源为压缩包的插件
+
+```js
+const jszip = require("jszip");
+const { RawSource } = require("webpack-sources");
+const { Compilation } = require("webpack");
+// 将打包产物压缩成压缩包
+/**
+ * 1. 如何获取打包后的文件名和文件内容
+ * 2. 如何实现压缩包
+ * 3. 如何向目标目录输出压缩包
+ */
+module.exports = class WebpackArchivePlugin {
+  constructor(options) {
+    this.options = options;
+  }
+  apply(compiler) {
+    // emit 钩子是webpack在确定好输出的文件名和文件内容之后 在写入谁的之前触发的，这是最后一个改变输出文件的机会
+    // compilation 
+    compiler.hooks.compilation.tap("webpackArchivePlugin", (compilation) => {
+      // processAssets 处理资源的钩子 在 compiler.hooks.emit钩子执行之前执行了
+      // 当确定好文件 当你处理每个资源的时候执行
+      compilation.hooks.processAssets.tapPromise(
+        {
+          name: "webpackArchivePlugin",
+          stage: Compilation.PROCESS_ASSETS_STAGE_ADDITIONS,
+        },
+        (assets) => {
+          // assets => 文件名：文件内容
+          const zip = new jszip();
+          for (const filename in assets) {
+            // 资源对象
+            const sourceObj = assets[filename];
+            // 资源的源代码
+            const sourceCode = sourceObj.source();
+            // 放入资源
+            zip.file(filename, sourceCode);
+          }
+          // 压缩
+          return zip
+            .generateAsync({ type: "nodebuffer" })
+            .then((zipContent) => {
+              // 放入资源
+              assets[`archive_${Date.now()}.zip`] = new RawSource(zipContent);
+            });
+        }
+      );
+    });
+  }
+};
+```
+
+最终产物里多了一个所有打包资源压缩为的一个压缩包，方便备份。
+
+
+
+### 外链插件
+
+对于一些工具库，例如`lodash`这种，我们希望可以走`cdn`，那么就需要用到外链插件了。
+
+1. 在`index.html`中通过脚本引入外链的工具库，也就是走cdn
+2. 打包的时候，不再打包工具库到最终产物里
+3. 在webpack配置文件中的externals属性中配置
+
+其实webpack已经提供的这种功能，我们只需在配置文件中提供一个externals的选项配置即可:
+
+```js
+module.exports = {
+  // 配置模块外链 原理是不再打包对应的lodash模块了（值就是模块导出的变量）
+  // 最终打包时 这些模块导出的内容是从 window.xxx 也就是说从window上取出来的
+  externals: {
+    lodash: "_",
+  },
+}
+```
+
+打包后的产物，其实就是将导出的内容指向window上的属性了。
+
+```js
+  var modules = {
+    lodash: (module) => {
+      module.exports = _;// window._
+    },
+  };
+```
+
+#### 需求
+
+我们的想法就是写一个插件，自动帮我们完成上面的操作，比如index.html文件中引入cdn资源，然后在配置文件中进行配置。
+
