@@ -3833,3 +3833,97 @@ module.exports = {
 };
 ```
 
+配置忽略查找的模块：
+
+```js
+const path = require("path");
+const webpack = require("webpack");
+module.exports = {
+  // ...
+  module: {
+    // 配置不需要解析这些模块的依赖 （生成ast等）也就是说里面不应该出现require import等
+    noParse: /lodash/,
+    rules: [{ test: /\.css$/, use: ["style-loader", "css-loader"] }],
+  },
+  plugins: [
+    new webpack.IgnorePlugin({
+      // 模块的正则表达式
+      contextRegExp: /moment$/,
+      // 资源的正则表达式
+      resourceRegExp: /^\.\/locale/, // 忽略语言包 不做多语言
+    }),
+  ],
+};
+
+```
+
+
+
+## 性能优化
+
+### 速度衡量插件
+
+```shell
+pnpm install speed-measure-webpack-plugin -D
+```
+
+可以查看各个阶段，每个插件等的消耗时间。
+
+使用方式：
+
+```js
+const path = require("path");
+const SpeedMeasureWebpackPlugin = require("speed-measure-webpack-plugin");
+const smwp = new SpeedMeasureWebpackPlugin({});
+module.exports = smwp.wrap({
+  entry: {
+    index: "./src/index.js",
+  },
+  output: {
+    path: path.resolve(__dirname, "dist"),
+    filename: "[name].js",
+  },
+  mode: "development",
+  devtool: false,
+  module: {
+    rules: [{ test: /\.css$/, use: ["style-loader", "css-loader"] }],
+  },
+  plugins: [
+  ],
+});
+```
+
+
+
+### 代码分析插件
+
+`webpack-bundle-analyzer`插件需要配合webpack和webpack-cli一起使用。该插件是生成代码的分析报告，帮助提升代码质量和网站性能。
+
+```shell
+pnpm install webpack-bundle-analyzer -D
+```
+
+```js
+const path = require("path");
+const SpeedMeasureWebpackPlugin = require("speed-measure-webpack-plugin");
+const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
+const smwp = new SpeedMeasureWebpackPlugin({});
+module.exports = smwp.wrap({
+  entry: {
+    index: "./src/index.js",
+  },
+  output: {
+    path: path.resolve(__dirname, "dist"),
+    filename: "[name].js",
+  },
+  mode: "development",
+  devtool: false,
+  module: {
+    rules: [{ test: /\.css$/, use: ["style-loader", "css-loader"] }],
+  },
+  plugins: [new BundleAnalyzerPlugin()],
+});
+```
+
+
+
