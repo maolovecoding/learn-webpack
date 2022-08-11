@@ -3927,3 +3927,35 @@ module.exports = smwp.wrap({
 
 
 
+## webpack打包库
+
+- 当用webpack去构建一个可以被其他模块导入使用的库时需要用到他们
+- `output.libary`配置导出库的名称
+- `output.libaryExport`配置需要导出的模块中那些子模块需要被导出。它只有在`output.libraryTarget`被设置成`commoonjs`或者`commonjs2`时使用才有意义
+- `output.libaryTarget`配置以何种方式导出库，是字符串的枚举类型，支持以下配置
+
+​		
+
+| libaryTarget |         使用者的引入方式          |     使用者提供给被使用者的模块的方式     |
+| :----------: | :-------------------------------: | :--------------------------------------: |
+|     var      |   只能以script标签的形式引入库    | 只能以全局变量的形式提供这些被依赖的模块 |
+|   commonjs   |   只能按照commonjs的规范引入库    |    被依赖模块需要按照commonjs规范引入    |
+|  commonjs2   |   只能按照commonjs2的规范引入库   |   被依赖模块需要按照commonjs2规范引入    |
+|     and      |          只能按照amd引入          |             遵循amd规范引入              |
+|     this     |                                   |                                          |
+|    window    |                                   |                                          |
+|    global    |                                   |                                          |
+|     umd      | 可以使用script，commonjs，amd引入 |                   同上                   |
+
+
+
+### 提取css
+
+因为css的下载和js可以并行，当一个html文件很大的时候，我们可以把css单独提取出来加载
+
+#### 安装
+
+```shell
+pnpm i mini-css-extract-plu
+```
+
