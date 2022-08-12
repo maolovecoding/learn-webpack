@@ -3956,6 +3956,66 @@ module.exports = smwp.wrap({
 #### 安装
 
 ```shell
-pnpm i mini-css-extract-plu
+pnpm i mini-css-extract-plugin -D
 ```
+
+#### 使用方式
+
+```js
+const path = require("path");
+const MiniCssWebpackPlugin = require("mini-css-extract-plugin");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+module.exports = {
+  entry: {
+    index: "./src/index.js",
+  },
+  output: {
+    path: path.resolve(__dirname, "dist"),
+    filename: "[name].js",
+  },
+  mode: "production",
+  devtool: false,
+  module: {
+    rules: [
+      { test: /\.css$/, use: [MiniCssWebpackPlugin.loader, "css-loader"] },
+    ],
+  },
+  // plugins: [new BundleAnalyzerPlugin()],
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: "./public/index.html",
+    }),
+    new MiniCssWebpackPlugin({
+      // filename: "[name].css",
+      // 也可以指定目录
+      filename: "css/[name].css",
+    }),
+  ],
+};
+```
+
+
+
+### 处理图片
+
+处理图片可以直接用webpack5的asset了。
+
+```js
+module.exports = {
+      module: {
+    rules: [
+      {
+        test: /\.png|jpg|gif/i,
+        type: "asset/resource",
+        generator: {
+          // 图片资源的位置
+          filename: "images/[hash][ext]",
+        },
+      },
+    ],
+  },
+}
+```
+
+
 

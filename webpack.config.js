@@ -4,7 +4,8 @@ const SpeedMeasureWebpackPlugin = require("speed-measure-webpack-plugin");
 const smwp = new SpeedMeasureWebpackPlugin({});
 const MiniCssWebpackPlugin = require("mini-css-extract-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-module.exports = smwp.wrap({
+// module.exports = smwp.wrap({
+module.exports = {
   entry: {
     index: "./src/index.js",
   },
@@ -15,11 +16,19 @@ module.exports = smwp.wrap({
     // library: "calc",
     // libraryTarget: "var",
   },
-  mode: "development",
+  mode: "production",
   devtool: false,
   module: {
     rules: [
       { test: /\.css$/, use: [MiniCssWebpackPlugin.loader, "css-loader"] },
+      {
+        test: /\.png|jpg|gif/i,
+        type: "asset/resource",
+        generator: {
+          // 图片资源的位置
+          filename: "images/[hash][ext]",
+        },
+      },
     ],
   },
   // plugins: [new BundleAnalyzerPlugin()],
@@ -27,6 +36,11 @@ module.exports = smwp.wrap({
     new HtmlWebpackPlugin({
       template: "./public/index.html",
     }),
-    new MiniCssWebpackPlugin(),
+    new MiniCssWebpackPlugin({
+      // filename: "[name].css",
+      // 也可以指定目录
+      filename: "css/[name].css",
+    }),
   ],
-});
+};
+// });
