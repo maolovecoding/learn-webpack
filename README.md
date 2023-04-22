@@ -3614,8 +3614,6 @@ class WebpackAssetsPlugin {
 module.exports = WebpackAssetsPlugin;
 ```
 
-
-
 ### 打包资源为压缩包的插件
 
 ```js
@@ -3669,8 +3667,6 @@ module.exports = class WebpackArchivePlugin {
 ```
 
 最终产物里多了一个所有打包资源压缩为的一个压缩包，方便备份。
-
-
 
 ### 外链插件
 
@@ -3793,8 +3789,6 @@ module.exports = class WebpackExternalPlugin {
 
 **插件的编写本身就是很复杂的事情，所以也没必要太较真了。知道如何编写，然后有问题就参考文档摸索了。**
 
-
-
 ## optimize
 
 ### 减少查找范围
@@ -3857,8 +3851,6 @@ module.exports = {
 
 ```
 
-
-
 ## 性能优化
 
 ### 速度衡量插件
@@ -3893,8 +3885,6 @@ module.exports = smwp.wrap({
 });
 ```
 
-
-
 ### 代码分析插件
 
 `webpack-bundle-analyzer`插件需要配合webpack和webpack-cli一起使用。该插件是生成代码的分析报告，帮助提升代码质量和网站性能。
@@ -3925,8 +3915,6 @@ module.exports = smwp.wrap({
 });
 ```
 
-
-
 ## webpack打包库
 
 - 当用webpack去构建一个可以被其他模块导入使用的库时需要用到他们
@@ -3934,7 +3922,7 @@ module.exports = smwp.wrap({
 - `output.libaryExport`配置需要导出的模块中那些子模块需要被导出。它只有在`output.libraryTarget`被设置成`commoonjs`或者`commonjs2`时使用才有意义
 - `output.libaryTarget`配置以何种方式导出库，是字符串的枚举类型，支持以下配置
 
-​		
+​  
 
 | libaryTarget |         使用者的引入方式          |     使用者提供给被使用者的模块的方式     |
 | :----------: | :-------------------------------: | :--------------------------------------: |
@@ -3946,8 +3934,6 @@ module.exports = smwp.wrap({
 |    window    |                                   |                                          |
 |    global    |                                   |                                          |
 |     umd      | 可以使用script，commonjs，amd引入 |                   同上                   |
-
-
 
 ### 提取css
 
@@ -3994,8 +3980,6 @@ module.exports = {
 };
 ```
 
-
-
 ### 处理图片
 
 处理图片可以直接用webpack5的asset了。
@@ -4017,8 +4001,6 @@ module.exports = {
 }
 ```
 
-
-
 ## sourcemap
 
 ### 什么是sourceMap
@@ -4039,8 +4021,6 @@ module.exports = {
 | `hidden-source-map`            | 需要隐藏 sourcemap                       | 能够隐藏 sourcemap                                         |
 | `nosources-source-map`         | 需要正确提示报错位置，但不暴露源码       | 能够正确提示报错位置，但不会暴露源码                       |
 
-
-
 ### 配置项
 
 - 配置项其实只是五个关键字eval、source-map、cheap、module和inline的组合
@@ -4052,3 +4032,152 @@ module.exports = {
 | `cheap`        | 不包含列信息，也不包含 loader 的 sourcemap      |
 | `module`       | 包含 loader 的 sourcemap，否则无法定义源文件    |
 | `inline`       | 将 .map 作为 DataURI 嵌入，不单独生成 .map 文件 |
+
+## AsyncQueue 异步并发控制器
+
+**实现原理**：
+
+```js
+// const AsyncQueue = require('webpack/lib/util/AsyncQueue')
+
+const QUEUE_STATE = 0 // 入队 等待执行
+const PROCESSING_STATE = 1 // 正在执行
+const DONE_STATE = 2 // 执行完毕
+
+class ArrayQueue {
+  list = []
+  enqueue(item) {
+    this.list.push(item)
+  }
+  dequeue() {
+    return this.list.shift()
+  }
+}
+class AsyncQueueEntry {
+  constructor(item, callback) {
+    this.item = item
+    this.state = QUEUE_STATE
+    this.callback = callback
+  }
+}
+
+class AsyncQueue {
+  constructor({ name, parallelism, processor, getKey }) {
+    this._name = name
+    this._parallelism = parallelism // 并发的个数
+    this._processor = processor
+    this._getKey = getKey
+    this._entries = new Map() // 判断是否添加过
+    this._queued = new ArrayQueue()
+    this._activeTasks = 0 // 当前正在执行的任务数
+    this._willEnsureProcessing = false // 是否要马上开始处理任务
+    // this._willEnsureProcessing = false 1. 任务执行完 2. 任务队列满了 只能等待认为执行完才能开始下一个
+  }
+  add(item, callback) {
+    const key = this._getKey(item)
+    const entry = this._entries.get(key) || null
+    if (entry !== null) {
+      if (entry.state === DONE_STATE) {
+        // 有这个任务 注册过 且任务执行完毕了 立刻执行的
+        process.nextTick(() => callback(entry.error, entry.result))
+      } else {
+        // 有这个任务 但是还没执行完毕 或者未开始执行 缓存callback
+        if (entry.callbacks) {
+          entry.callbacks.push(callback)
+        } else {
+          entry.callbacks = [callback]
+        }
+      }
+      return
+    }
+    const newEntry = new AsyncQueueEntry(item, callback)
+    this._entries.set(key, newEntry)
+    this._queued.enqueue(newEntry)
+    if (!this._willEnsureProcessing) {
+      this._willEnsureProcessing = true
+      setImmediate(() => this._ensureProcessing()) // 下个事件环开始执行任务
+    }
+  }
+  _ensureProcessing() {
+    // 执行任务数小于并发任务数
+    while (this._activeTasks < this._parallelism) {
+      const entry = this._queued.dequeue()
+      if (!entry) break
+      this._activeTasks++ // 执行并发任务数量增加
+      entry.state = PROCESSING_STATE // 状态 执行中
+      this._startProcessing(entry)
+    }
+    this._willEnsureProcessing = false
+  }
+  _startProcessing(entry) {
+    this._processor(entry.item, (err, res) => {
+      this._handleResult(entry, err, res)
+    })
+  }
+  _handleResult(entry, error, result) {
+    const cb = entry.callback // 完成回调函数
+    const cbs = entry.callbacks // 注册相同任务的回调函数集合
+    entry.state = DONE_STATE // 完成态
+    entry.result = result // 记录结果和错误
+    entry.error = error
+    cb(error, result) // 执行回调
+    cbs?.forEach(cb => cb(error, result))
+    this._activeTasks--
+    if (!this._willEnsureProcessing) {
+      this._willEnsureProcessing = true
+      setImmediate(() => this._ensureProcessing()) // 下个事件环开始执行任务
+    }
+  }
+}
+
+// 处理器
+const processor = (item, callback) => {
+  setTimeout(() => {
+    console.log('处理：', item)
+    callback(null, item)
+  }, 2000)
+}
+// 获取唯一标识
+const getKey = (item) => {
+  console.log(item.key, '---')
+  return item.key
+}
+
+
+const queue = new AsyncQueue({
+  name: "创建模块",
+  parallelism: 3, // 同时执行的异步任务的并发数
+  processor, // 如何创建模块 每个条目 要经过如何处理
+  getKey, // key是每个item的唯一标识
+})
+
+const startTime = Date.now()
+const item1 = { key: 'item1' }
+queue.add(item1, (err, item) => {
+  console.log(item, Date.now() - startTime)
+})
+const item2 = { key: 'item2' }
+queue.add(item2, (err, item) => {
+  console.log(item, Date.now() - startTime)
+})
+const item3 = { key: 'item3' }
+queue.add(item3, (err, item) => {
+  console.log(item, Date.now() - startTime)
+})
+const item4 = { key: 'item4' }
+queue.add(item4, (err, item) => {
+  console.log(item, Date.now() - startTime)
+})
+// 唯一的key重复的 不需要注册了
+const item5 = { key: 'item1' }
+queue.add(item5, (err, item) => {
+  console.log(item, Date.now() - startTime, '重复key回调')
+})
+
+setTimeout(() => {
+  const item5 = { key: 'item1' }
+  queue.add(item5, (err, item) => {
+    console.log(item, Date.now() - startTime, '重复key回调')
+  })
+}, 2200)
+```
