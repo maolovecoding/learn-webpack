@@ -1,2 +1,11 @@
-const sum = (a, b) => a + b;
-console.log(sum(1, 2));
+
+const render = () => {
+  const title = require('./title.js')
+  document.getElementById('root').innerText = title 
+}
+
+render()
+
+if (module.hot) {
+  module.hot.accept(['./title.js'], render)
+}

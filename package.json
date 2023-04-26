@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack",
-    "dev": "webpack serve"
+    "dev": "webpack serve",
+    "debug": "webpack serve",
+    "mydev": "nodemon ./webpack-dev-server/startDevServer.js"
   },
   "repository": {
     "type": "git",
@@ -62,6 +64,10 @@
     "webpack-dev-server": "^4.9.3"
   },
   "dependencies": {
-    "lodash": "^4.17.21"
+    "express": "^4.18.2",
+    "lodash": "^4.17.21",
+    "memory-fs": "^0.5.0",
+    "mime": "^3.0.0",
+    "socket.io": "^4.6.1"
   }
 }
