@@ -4190,3 +4190,35 @@ setTimeout(() => {
 2. 还会其他一个websocket双向通信服务器，如果有新的模块发生变更的话，会通过消息的方式通知客户端，让客户端拉取最新的代码，并且进行客户端的热更新。
 
 客户端会有两个hash值，上一次的hash：lastHash。一个最新的hash值 currentHash
+
+## webpack性能优化
+
+### 缩小范围
+
+#### extensions
+
+指定extension之后可以不用在require或是import的时候加文件扩展名,会依次尝试添加扩展名进行匹配
+
+```js
+module.exports = {
+  resolve: {
+    extensions: ['.js', '.ts']
+  }
+}
+```
+
+#### alias
+
+配置别名可以加快webpack查找模块的速度
+
+每当引入bootstrap模块的时候，它会直接引入bootstrap,而不需要从node_modules文件夹中按模块的查找规则查找
+
+```js
+module.exports = {
+  resolve: {
+    alias: {
+      bootstrap: path.resolve(__dirname, 'node_modules/bootstrap')
+    }
+  }
+}
+```
