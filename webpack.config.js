@@ -67,6 +67,3 @@ module.exports = {
     extensions: ['.js', 'json', '.ts', '.tsx', '.jsx']
   }
 }
-
-// 张仁阳
-// 83687401
